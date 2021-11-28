@@ -1,0 +1,28 @@
+{
+  "name": "json-schema-non-instances",
+  "version": "1.0.0",
+  "description": "Generate both valid and invalid JSON Schema instances",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zpleal/json-schema-non-instances.git"
+  },
+  "keywords": [
+    "validation",
+    ";",
+    "automated",
+    "assessment"
+  ],
+  "author": "Jose Paulo Leal",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/zpleal/json-schema-non-instances/issues"
+  },
+  "homepage": "https://github.com/zpleal/json-schema-non-instances#readme",
+  "devDependencies": {
+    "mocha": "^9.1.3"
+  }
+}
