@@ -1,9 +1,9 @@
-
+ 
 const DEFAULT_MAX_LENGTH = 2; // default maxLength for strings  
 const DEFAULT_MAX_ITEMS  = 5; // default maxItems for arrays
 
-const GENERATORS = {
-    "null":     anyGenerator,
+const BASIC_GENERATORS = {
+    "null":     nullGenerator,
     "boolean":  booleanGenerator,
     "number":   numberGenerator,
     "string":   stringGenerator,
@@ -15,10 +15,12 @@ function* jsonGenerator(jsonSchema,non) {
 
     switch(typeof jsonSchema) {
         case "boolean": 
-            yield* anyGenerator(_, !jsonSchema || non);
+            yield* anyGenerator(jsonSchema, !jsonSchema || non);
             break;
         case "object":
-            if("type" in jsonSchema)
+            if(jsonSchema === null)
+                yield* anyGenerator(jsonSchema,non);
+            else if("type" in jsonSchema)
                 yield* generateFromType(jsonSchema,non);
             else if("enum" in jsonSchema)
                 yield* generateFromEnum(jsonSchema,non);
@@ -28,7 +30,7 @@ function* jsonGenerator(jsonSchema,non) {
 }
 
 /**
- * Generates (non) instances ffrom enumeration
+ * Generates (non) instances from enumeration
  
  */
 function* generateFromEnum(jsonSchema,non) {
@@ -42,17 +44,17 @@ function* generateFromEnum(jsonSchema,non) {
 }
 
 function* generateFromType(jsonSchema,non) {
-    const generator = GENERATORS[jsonSchema.type];
+    const generator = BASIC_GENERATORS[jsonSchema.type];
 
     if(non) {
-        const other = Object.keys(GENERATORS)
+        const other = Object.keys(BASIC_GENERATORS)
         .filter((n) => n !== jsonSchema.type)
-        .map(n => GENERATORS[n]());
+        .map(n => BASIC_GENERATORS[n]());
 
         if(generator)
             other.push(generator(jsonSchema,non));
 
-        return combine(other);
+        yield* combine(other);
     } else {
         if(generator)
             yield* generator(jsonSchema);
@@ -86,9 +88,22 @@ function* anyGenerator(_,non) {
     if(non) {
         // no JSON object
     } else
-        yield* combine(Object.keys(GENERATORS).map(n => GENERATORS[n]()));
+        yield* combine(Object.keys(BASIC_GENERATORS).map(n => BASIC_GENERATORS[n]()));
 }
 
+/**
+  * Generates (non) instance objects of given JSON Schema 
+ * 
+ * @param {*} jsonSchema a JSON Schema object (ignored for booleans)
+ * @param {*} non if true generates a non instance   
+ */
+ function* nullGenerator(_,non) {
+    if(non)
+        anyGenerator();
+    else
+        while(true) 
+            yield null;
+} 
 
 /**
   * Generates (non) instance objects of given JSON Schema 
@@ -174,7 +189,7 @@ function* arrayGenerator(jsonSchema,non) {
     const schema    = {
         minItems: 0,
         maxItems: DEFAULT_MAX_ITEMS,
-        items: null,
+        items: true,
         ...jsonSchema
     };
 
@@ -215,35 +230,45 @@ function* objectGenerator(jsonSchema,non) {
         required: [],
         ...jsonSchema,
     };
-    const iterators  = {};
 
-    for(const p in properties)
-        iterators[p] = jsonGenerator(properties[p]);
+    if(Object.keys(schema.properties).length == 0) {
+        // no properties defined -> generates the empty object
+        // TODO: should property names be generated?
+        while(true)
+            yield {};
 
-    while(true) {
-        const value = {};
-        let count   = 0;
-        let still = required; 
-        for(const p in properties) {
-            value[p] = iterators[p].next().value;
-            count++;
-            still = require.filter((s) => s !== p);
-            
-            if(count < minProperties) {
-                if(non)
+    } else {
+
+        const iterators = {};
+
+        for (const p in schema.properties)
+            iterators[p] = jsonGenerator(schema.properties[p]);
+
+        while (true) {
+            const value = {};
+            let count = 0;
+            let still = schema.required;
+            for (const p in schema.properties) {
+                value[p] = iterators[p].next().value;
+                count++;
+                still = still.filter((s) => s !== p);
+
+                if (count < schema.minProperties) {
+                    if (non)
+                        yield value;
+                } else if (count > schema.maxProperties) {
+                    if (non)
+                        yield value;
+                } else if (still.length > 0) {
+                    if (non)
+                        yield value;
+                } else if (non) {
+                    //TODO check other objects restrictions (e.g. propertyNames)
+                } else {
                     yield value;
-            } else if(count > maxProperties) {
-                if(non)
-                    yield value;
-            } else if(still.length > 0) {
-                if(non)
-                    yield value;
-            } else if(non) {
-                //TODO check other objects restrictions (e.g. propertyNames)
-            } else {
-                yield value;
-            } 
-        }    
+                }
+            }
+        }
     }
 }
 

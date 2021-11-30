@@ -21,6 +21,44 @@ describe('Enum', function() {
     });
 });
 
+
+describe('All or nothing',function() {
+    describe('with true anything is valid',function() {
+        const instances = generator(true);
+
+        for(let c=0; c< 10; c++)
+            ((value) => {
+                it(`anything goes, including ${JSON.stringify(value)}`,function(done) {
+                    assert(true);
+                    done();
+                })
+            })(instances.next().value);
+    });
+
+    describe('with false nothing is valid',function() {
+        const instances = generator(false);
+
+        it('nothing is generated',function(done) {
+            assert(instances.next().done);
+            done();
+        });
+    });
+
+    describe('with {} anything is valid',function() {
+        const instances = generator({});
+
+        for(let c=0; c< 10; c++)
+            ((value) => {
+                it(`anything goes, including ${JSON.stringify(value)}`,function(done) {
+                    assert(true);
+                    done();
+                })
+            })(instances.next().value);
+    });
+
+});
+
+
 describe('Booleans', function() {
   describe('all boolean values', function() {
     const instances = generator({ "type": "boolean"});
@@ -37,6 +75,24 @@ describe('Booleans', function() {
 });
 
 describe('Numbers', function() {
+    describe('integers betwen 5 and 10', function() {
+        const instances = generator({ 
+            "type": "number",
+            "minimum": 5,
+            "maximum": 10,
+            "multiple": 1,
+        });
+        
+        
+        for(let number=5; number <= 10; number++)
+            ((value,expected) => {
+                it(`expected ${expected}`,function(done) {
+                    assert.equal(value,expected);
+                    done();
+                });
+            })(instances.next().value,number) ;  
+    });
+
     describe('even numbers less than 10', function() {
         const instances = generator({ 
             "type": "number",
@@ -45,14 +101,31 @@ describe('Numbers', function() {
             "multiple": 2,
         });
         
-        
-        for(let even=0; even <= 10; even += 2)
-            it(`expected ${even}`,function(done) {
-                assert.equal(instances.next().value,even);
-                done();
-            });     
+        for(let number=0; number <= 10; number += 2)
+            ((value,expected) => {
+                it(`expected ${expected}`,function(done) {
+                    assert.equal(value,expected);
+                    done();
+                });
+            })(instances.next().value,number) ; 
+
     });
+    /*
+    describe('non numbers', function(done) {
+        const instances = generator({ "type": "number" },"no");
+
+        for(let c=0; c< 10; c++)
+            ((value) => {
+                it(`anything but a number such as ${JSON.stringify(value)}`,function(done) {
+                    assert(typeof value !== "number");
+                    done();
+                });
+            })(instances.next().value);
+        
+    });
+    */
 });
+
 
 describe('Strings', function() {
     describe('Strings with less than 3 chars',function() {
@@ -135,4 +208,29 @@ describe('Arrays', function() {
                  
              }
         });
+});
+
+
+describe('Objects', function() {
+
+    describe('Simple name value pair',function() {
+        const instances = generator({ 
+            "type": "object",
+            "properties": {
+                "name": { "type": "string", minLength: 1},
+                "value": { "type": "number"}
+            },
+            "required": [ "name", "value"]
+        });
+
+        it('expected { "name": "a", "value": 0 }',function(done) {
+            assert.deepEqual(instances.next().value,{name:"a","value":0})
+            done();
+        });
+        it('expected { "name": "aa", "value": 1 }',function(done) {
+            assert.deepEqual(instances.next().value,{name:"aa","value":1})
+            done();
+        });
+
+    });
 });
