@@ -34,14 +34,17 @@ function* jsonGenerator(jsonSchema,non) {
  
  */
 function* generateFromEnum(jsonSchema,non) {
-    
-    for(const value of jsonSchema.enum)
-        if(non) { 
-            if(value.length > 0)
-                yield value.replace(value[0],'');
-        } else
-            yield value;
-}
+    while(true)
+        for(const value of jsonSchema.enum)
+            if(non) { 
+                for(const char of value) {
+                    const wrong = value.replace(char,'');
+                    if(! jsonSchema.enum.includes(wrong))
+                        yield wrong;
+                }
+            } else
+                yield value;
+        }
 
 function* generateFromType(jsonSchema,non) {
     const generator = BASIC_GENERATORS[jsonSchema.type];
@@ -161,21 +164,23 @@ function* stringGenerator (jsonSchema,non) {
         ...jsonSchema
     }
 
-    let value = ""
+    while(true) {
+        let value = ""
 
-    for(let c=0; c <= schema.maxLength; c++) {
-        if(c < schema.minLength) {
-            if(non)
+        for(let c=0; c <= schema.maxLength; c++) {
+            if(c < schema.minLength) {
+                if(non)
+                    yield value;
+            } else if(c > schema.maxLength) {
+                if(non)
+                    yield value;
+            } else if(non) {
+                // check other string constraints (e.g. pattern)
+            } else 
                 yield value;
-        } else if(c > schema.maxLength) {
-            if(non)
-                yield value;
-        } else if(non) {
-            // check other string constraints (e.g. pattern)
-        } else 
-            yield value;
 
-        value += "a";
+            value += "a";
+        }
     }
 }
 
@@ -201,14 +206,14 @@ function* arrayGenerator(jsonSchema,non) {
         for(let c = 0; c <= schema.maxItems; c++) {
             if(c < schema.minItems) {
                 if(non)
-                    yield array;
+                    yield clone(array);
             } else if(c > schema.maxItems) {
                 if(non)
-                    yield array;
+                    yield clone(array);
             } else if(non) {
                 // check other kinds of array restrictions (e.g. uniqueElements)
             } else {
-                yield array;
+                yield clone(array);
             }
 
             array.push(instances.next().value);
@@ -255,21 +260,32 @@ function* objectGenerator(jsonSchema,non) {
 
                 if (count < schema.minProperties) {
                     if (non)
-                        yield value;
+                        yield clone(value);
                 } else if (count > schema.maxProperties) {
                     if (non)
                         yield value;
                 } else if (still.length > 0) {
                     if (non)
-                        yield value;
+                        yield clone(value);
                 } else if (non) {
                     //TODO check other objects restrictions (e.g. propertyNames)
                 } else {
-                    yield value;
+                    yield clone(value);
                 }
             }
         }
     }
+}
+
+/**
+ * Objects and arrays must be cloned (deep copied) before being yield, 
+ * since they are used for the creation of several instances.
+ * @param {*} value to clone
+ * @returns a clone (deep copy)
+ */
+function clone(value) {
+    // TODO replace this implementation for a more efficient one
+    return JSON.parse(JSON.stringify(value));
 }
 
 module.exports = jsonGenerator;
