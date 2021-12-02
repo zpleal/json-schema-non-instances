@@ -1,21 +1,22 @@
 const assert = require('assert');
-const generator  = require('../generator.js');
+const { instances, nonInstances }  = require('../generator.js');
+
 
 describe('Enum', function() {
     describe('Enumerate single character words', function() {
         const enumeration = [ "a", "b", "c"];
-        theseWillGo(generator({ "enum": enumeration}), enumeration.concat(enumeration));
+        theseWillGo(instances({ "enum": enumeration}), enumeration.concat(enumeration));
 
     });
 
     describe('Enumerate empty string and full words', function() {
         const enumeration = [ "", "Hello", "World"];
-        theseWillGo(generator({ "enum": enumeration}), enumeration.concat(enumeration));          
+        theseWillGo(instances({ "enum": enumeration}), enumeration.concat(enumeration));          
     });
 
     describe('Enumerate non intances of full words', function() {
 
-        theseWillGo(generator({ "enum": [ "Hello", "World"]},true),[ 
+        theseWillGo(nonInstances({ "enum": [ "Hello", "World"]}),[ 
             "ello", "Hllo", "Helo", "Helo", "Hell", 
             "orld", "Wrld", "Wold", "Word", "Worl",
             "ello", "Hllo", "Helo", "Helo", "Hell",
@@ -26,24 +27,24 @@ describe('Enum', function() {
 
 
 describe('All or nothing',function() {
-    describe('with true anything is valid',() => anythingGoes(generator(true)) );
+    describe('with true anything is valid',() => anythingGoes(instances(true)) );
 
-    describe('with false nothing is valid',() => nothingGoes(generator(false)) );
+    describe('with false nothing is valid',() => nothingGoes(instances(false)) );
 
-    describe('with {} anything is valid',() => anythingGoes(generator({})) );
+    describe('with {} anything is valid',() => anythingGoes(instances({})) );
     
-    describe('Nothing is a non instace of {}',() => nothingGoes(generator({},true)) );
+    describe('Nothing is a non instace of {}',() => nothingGoes(nonInstances({})) );
 
 });
 
 
 describe('Booleans', function() {
-  describe('all boolean values', () => theseWillGo(generator({ "type": "boolean"}),
+  describe('all boolean values', () => theseWillGo(instances({ "type": "boolean"}),
     [true, false, true, false,true,false]));
 });
 
 describe('Numbers', function() {
-    describe('integers betwen 5 and 10', () => theseWillGo(generator(
+    describe('integers betwen 5 and 10', () => theseWillGo(instances(
         { 
             "type": "number",
             "minimum": 5,
@@ -51,7 +52,7 @@ describe('Numbers', function() {
             "multiple": 1,
         }),[5,6,7,8,9,10]));
 
-    describe('even numbers less than 10',  () => theseWillGo(generator({ 
+    describe('even numbers less than 10',  () => theseWillGo(instances({ 
             "type": "number",
             "minimum": 0,
             "maximum": 10,
@@ -76,18 +77,18 @@ describe('Numbers', function() {
 
 
 describe('Strings', function() {
-    describe('Simple strings (with default maxLength=2)',() => theseWillGo(generator(
+    describe('Simple strings (with default maxLength=2)',() => theseWillGo(instances(
         {"type": "string"}), 
         [ "", "a", "aa", "", "a", "aa", "", ] ));
 
 
-    describe('Strings with less than 3 chars',() => theseWillGo(generator(
+    describe('Strings with less than 3 chars',() => theseWillGo(instances(
         { 
             "type": "string",
             "maxLength": 3
         }), [ "", "a", "aa", "aaa", "", "a"] ));
 
-    describe('Strings with betwwen 4 and 7 chars',() => theseWillGo(generator(
+    describe('Strings with betwwen 4 and 7 chars',() => theseWillGo(instances(
             { 
                 "type": "string",
                 "minLength": 4,
@@ -99,14 +100,14 @@ describe('Strings', function() {
  
 describe('Arrays', function() {
 
-    describe('boolean array with no more than 4 itens',() => theseWillGo(generator(
+    describe('boolean array with no more than 4 itens',() => theseWillGo(instances(
         { 
             "type": "array",
             "items": { "type": "boolean" },  
             "maxItems": 4
         }), [ [], [true], [true,false] ] ));
 
-    describe('array of multiples of 3 less or equal 10',() => theseWillGo(generator(
+    describe('array of multiples of 3 less or equal 10',() => theseWillGo(instances(
         { 
             "type": "array",
             "items": { 
@@ -124,7 +125,7 @@ describe('Arrays', function() {
 
 describe('Objects', function() {
 
-    describe('Object with simple properties',() => theseWillGo(generator(
+    describe('Object with simple properties',() => theseWillGo(instances(
         { 
             "type": "object",
             "properties": {
@@ -155,7 +156,7 @@ describe('Objects', function() {
          ]
     ));
 
-    describe('Simple name/value pair, both required',() => theseWillGo(generator(
+    describe('Simple name/value pair, both required',() => theseWillGo(instances(
         { 
             "type": "object",
             "properties": {
