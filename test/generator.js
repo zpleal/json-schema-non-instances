@@ -76,11 +76,24 @@ describe('Numbers', function() {
 
 
 describe('Strings', function() {
+    describe('Simple strings (with default maxLength=2)',() => theseWillGo(generator(
+        {"type": "string"}), 
+        [ "", "a", "aa", "", "a", "aa", "", ] ));
+
+
     describe('Strings with less than 3 chars',() => theseWillGo(generator(
         { 
             "type": "string",
             "maxLength": 3
         }), [ "", "a", "aa", "aaa", "", "a"] ));
+
+    describe('Strings with betwwen 4 and 7 chars',() => theseWillGo(generator(
+            { 
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 7
+            }), [ "aaaa", "aaaaa", "aaaaaa", "aaaaaaa", 
+                  "aaaa", "aaaaa", "aaaaaa", "aaaaaaa"] ));
 });
 
  
@@ -111,7 +124,38 @@ describe('Arrays', function() {
 
 describe('Objects', function() {
 
-    describe('Simple name value pair, both required',() => theseWillGo(generator(
+    describe('Object with simple properties',() => theseWillGo(generator(
+        { 
+            "type": "object",
+            "properties": {
+                "b": { "type": "boolean"},
+                "n": { "type": "number"},
+                "s": { "type": "string" },
+            },
+
+        }),[ 
+            { "b": true },
+            { "b": true, "n": 0 } ,
+            { "b": true, "n": 0, "s": "" } ,
+            { "b": false },
+            { "b": false, "n": 1 },
+            { "b": false, "n": 1, "s": "a" },
+            { "b": true },
+            { "b": true, "n": 2 } ,
+            { "b": true, "n": 2, "s": "aa" } ,
+            { "b": false },
+            { "b": false, "n": 3 },
+            { "b": false, "n": 3, "s": "" }, // default maxLenght is 2
+            { "b": true },
+            { "b": true, "n": 4 } ,
+            { "b": true, "n": 4, "s": "a" },
+            { "b": false },
+            { "b": false, "n": 5 },
+            { "b": false, "n": 5, "s": "aa" }
+         ]
+    ));
+
+    describe('Simple name/value pair, both required',() => theseWillGo(generator(
         { 
             "type": "object",
             "properties": {
@@ -122,7 +166,8 @@ describe('Objects', function() {
         }),[ 
             { "name": "a", "value": 0 } ,
             { "name": "aa", "value": 1 }
-         ]));
+         ])
+    );
 
 });
 
@@ -133,7 +178,7 @@ describe('Objects', function() {
 
  /**
   * Check if the generated instances corresponde to the given sequence.
-  * Values are compared using deepEqual(), in case they a objects or arrays.
+  * Values are compared using deepEqual(), in case they objects or arrays.
   * 
   * @param {*} instances 
   * @param {*} sequence 
@@ -148,17 +193,33 @@ function theseWillGo(instances,sequence) {
         })(instances.next().value,item);
 }
 
-
+/**
+ * Check that many instances of different types are generated
+ * @param {*} instances 
+ */
 function anythingGoes(instances) { 
+    const types = [];
     for(let c=0; c< 10; c++)
         ((value) => {
+            const type = typeof value;
+            if(! types.includes(type))
+                types.push(type);
             it(`anything goes, including ${JSON.stringify(value)}`,function(done) {
                 assert(true);
                 done();
         })
     })(instances.next().value);
+
+    it(`different types where generated: ${JSON.stringify(types)}`, (done) => {
+        assert(types.length >= 4);
+        done();
+    })
 }
 
+/**
+ * Check that no instance is ever generated
+ * @param {*} instances 
+ */
 function nothingGoes(instances) {
     it('nothing is generated',function(done) {
         assert(instances.next().done);

@@ -1,4 +1,22 @@
- 
+/********************************************************************\
+ *  Generator of both instances and non instances of JSON Schemas   *
+ *                                                                  *
+ *  An instance of a JSON Schema is a valid JSON in that schema.    *
+ *  A non-instance is invalid and should be as small possible.      *
+ *  Non-instances are useful for JSON Schema validation in          *
+ *  automated assessment.                                           *
+ *                                                                  *
+ *  This module exposes a function with 2 arguments:                *
+ *     * a JSON Schema to generate instances                        *
+ *     * a boolean - when true generates a non-instance             *
+ *                                                                  *
+ *  It either generates an infinite cyclical sequence               *
+ *  of (non)instances or nothing at all, if none exists.            *
+ *                                                                  *  
+ *                                         José Paulo Leal          *
+ *                                         December 2021            *   
+\********************************************************************/
+
 const DEFAULT_MAX_LENGTH = 2; // default maxLength for strings  
 const DEFAULT_MAX_ITEMS  = 5; // default maxItems for arrays
 
