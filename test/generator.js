@@ -61,7 +61,7 @@ describe('Numbers', function() {
 
     /*
     describe('non numbers', function(done) {
-        const instances = generator({ "type": "number" },"no");
+        const instances = nonInstances({ "type": "number" });
 
         for(let c=0; c< 10; c++)
             ((value) => {

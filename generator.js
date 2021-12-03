@@ -111,10 +111,10 @@ class JSONGenerator {
             if(non) {
                 const other = JSON_TYPES
                     .filter((n) => n !== jsonSchema.type)
-                    .map(n => this[n+"Generator"].bind(this));
+                    .map(n => this[n+"Generator"].call(this));
         
                 if(generator)
-                    other.unshift(generator(jsonSchema,non).bind(this));
+                    other.unshift(generator(jsonSchema,non));
         
                 yield* this.combine(other);
             } else 
