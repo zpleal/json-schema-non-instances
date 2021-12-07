@@ -17,9 +17,26 @@
  *                                         December 2021            *   
 \********************************************************************/
 
-const DEFAULT_MAX_LENGTH = 2; // default maxLength for strings  
-const DEFAULT_MAX_ITEMS  = 5; // default maxItems for arrays
-
+/**
+ * Default maxLength for strings
+ */
+const DEFAULT_MAX_LENGTH = 2;
+/**
+ * Default maxItems for arrays
+ */  
+const DEFAULT_MAX_ITEMS  = 5;
+/**
+ * Default minimum for numbers
+ */
+const DEFAULT_MINIMUM    = 0;
+/**
+ * Default maximum for numbers
+ */
+const DEFAULT_MAXIMUM    = 5;
+/**
+ * Names of JSON types.
+ * Thers is a generator funtion for each of them.
+ */
 const JSON_TYPES = [ "null", "boolean","number", "string", "array", "object" ];   
 
 
@@ -192,22 +209,27 @@ class JSONGenerator {
      */
     *numberGenerator(jsonSchema,non) {
         const schema = {
-            minimum:  0,
-            maximum:  DEFAULT_MAX_ITEMS,
-            multiple: 1,
             ...jsonSchema
         };
-        const start = schema.minimumExclusive ? schema.minimumExclusive + 1 : schema.minimum;
-        const stop  = schema.maximumExclusive ? schema.maximumExclusive - 1 : schema.maximum;
-        const step  = schema.multiple || 1;
 
-        if(non) { // just 2 examples
-            yield start - 1;
-            yield stop  + 1;  
-        } else
+        if(non) { // just 2 examples, if limits where define
+            const less = schema.minimum || schema.minimumExclusive;
+            const more = schema.maximum || schema.maximum;
+
+            if(typeof less === "number")
+                yield minimum - 2;
+            if(typeof more === "number")
+                yield maximum + 2
+
+        } else {
+            const start = schema.minimumExclusive + 1 || schema.minimum || DEFAULT_MINIMUM
+            const stop  = schema.maximumExclusive - 1 || schema.maximum || DEFAULT_MAXIMUM ;
+            const step  = schema.multiple || 1;
+
             while(true)
                 for(let value = start; value <= stop; value += step)
                     yield value;
+        }
     }
 
     /**

@@ -2,6 +2,7 @@ const assert = require('assert');
 const { instances, nonInstances }  = require('../generator.js');
 
 
+
 describe('Enum', function() {
     describe('Enumerate single character words', function() {
         const enumeration = [ "a", "b", "c"];
@@ -26,6 +27,7 @@ describe('Enum', function() {
 });
 
 
+
 describe('All or nothing',function() {
     describe('with true anything is valid',() => anythingGoes(instances(true)) );
 
@@ -39,8 +41,12 @@ describe('All or nothing',function() {
 
 
 describe('Booleans', function() {
+
   describe('all boolean values', () => theseWillGo(instances({ "type": "boolean"}),
     [true, false, true, false,true,false]));
+
+   describe('non booleans', () => nothingButType(nonInstances({ "type": "boolean" }),"boolean") );
+
 });
 
 describe('Numbers', function() {
@@ -59,20 +65,9 @@ describe('Numbers', function() {
             "multiple": 2,
         }),[0,2,4,6,8,10]));
 
-    /*
-    describe('non numbers', function(done) {
-        const instances = nonInstances({ "type": "number" });
-
-        for(let c=0; c< 10; c++)
-            ((value) => {
-                it(`anything but a number such as ${JSON.stringify(value)}`,function(done) {
-                    assert(typeof value !== "number");
-                    done();
-                });
-            })(instances.next().value);
-        
-    });
-    */
+    
+    describe('non numbers', () => nothingButType(nonInstances({ "type": "number" }),"number") );
+    
 });
 
 
@@ -95,9 +90,11 @@ describe('Strings', function() {
                 "maxLength": 7
             }), [ "aaaa", "aaaaa", "aaaaaa", "aaaaaaa", 
                   "aaaa", "aaaaa", "aaaaaa", "aaaaaaa"] ));
+
+    // describe('non strings', () => nothingButType(nonInstances({ "type": "string" }),"string") );
 });
 
- 
+
 describe('Arrays', function() {
 
     describe('boolean array with no more than 4 itens',() => theseWillGo(instances(
@@ -120,6 +117,7 @@ describe('Arrays', function() {
             }),[ [3], [3,6], [3,6,9] ]));
             
  
+     describe('non arrays', () => nothingButType(nonInstances({ "type": "array" }),"array") );
 });
 
 
@@ -170,6 +168,8 @@ describe('Objects', function() {
          ])
     );
 
+    //describe('non objects', () => nothingButType(nonInstances({ "type": "object" }),"object") );
+
 });
 
 
@@ -218,6 +218,23 @@ function anythingGoes(instances) {
 }
 
 /**
+ * Check that none of the instances is of the given type
+ * 
+ * @param {*} instances 
+ * @param {*} type 
+ */
+function nothingButType(instances,type) {
+
+    for(let c=0; c< 10; c++)
+        ((value) => {
+            it(`anything but a ${type}, such as ${JSON.stringify(value)}`,function(done) {
+                assert(typeof value !== type);
+                done();
+            });
+        })(instances.next().value);
+    }
+
+/**
  * Check that no instance is ever generated
  * @param {*} instances 
  */
@@ -227,3 +244,4 @@ function nothingGoes(instances) {
         done();
     });
 }
+
