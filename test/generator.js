@@ -1,7 +1,43 @@
 const assert = require('assert');
-const { instances, nonInstances }  = require('../generator.js');
+const { jsonTypeOf, instances, nonInstances }  = require('../generator.js');
+
+/**
+ * default number of test repetions
+ */
+const repetions= 10;
+
+describe('non booleans', () => nothingButType(nonInstances({ "type": "boolean" }),"boolean") );
 
 
+describe('Static methods',() => {
+    describe('JSON type', () => {
+        for( let {value, type} of [ 
+            { value: null,   type: "null"   }, 
+            { value: true,   type: "boolean"}, 
+            { value: false,  type: "boolean"},
+            { value: 0,      type: "number" },
+            { value: 1,      type: "number" },
+            { value: 1.1,    type: "number" },
+            { value: -2,     type: "number" },
+            { value: "",     type: "string" },
+            { value: "a",    type: "string" },
+            { value: "aa",   type: "string" },
+            { value: "aa",   type: "string" },
+            { value: [],     type: "array"  },
+            { value: [true], type: "array"  },
+            { value: [1,2,3],type: "array"  },
+            { value: [{}],   type: "array"  },
+            { value: [{a:1}],type: "array"  },
+            { value: {}     ,type: "object" },
+            { value: {a:1}  ,type: "object" },
+            { value: {a:[]} ,type: "object" }
+        ])
+            it(`check if "${type}" is the type of ${JSON.stringify(value)}`, (done) =>  {
+                assert.equal(jsonTypeOf(value),type);
+                done();
+            });
+    });
+});
 
 describe('Enum', function() {
     describe('Enumerate single character words', function() {
@@ -25,7 +61,6 @@ describe('Enum', function() {
         ]);
     });
 });
-
 
 
 describe('All or nothing',function() {
@@ -91,7 +126,7 @@ describe('Strings', function() {
             }), [ "aaaa", "aaaaa", "aaaaaa", "aaaaaaa", 
                   "aaaa", "aaaaa", "aaaaaa", "aaaaaaa"] ));
 
-    // describe('non strings', () => nothingButType(nonInstances({ "type": "string" }),"string") );
+     describe('non strings', () => nothingButType(nonInstances({ "type": "string" }),"string") );
 });
 
 
@@ -168,14 +203,16 @@ describe('Objects', function() {
          ])
     );
 
-    //describe('non objects', () => nothingButType(nonInstances({ "type": "object" }),"object") );
+    describe('non objects', () => nothingButType(nonInstances({ "type": "object" }),"object") );
 
 });
+
 
 
 /*----------------*\
  |  Utilities     |
  \*---------------*/
+
 
  /**
   * Check if the generated instances corresponde to the given sequence.
@@ -194,19 +231,20 @@ function theseWillGo(instances,sequence) {
         })(instances.next().value,item);
 }
 
+
 /**
  * Check that many instances of different types are generated
  * @param {*} instances 
  */
 function anythingGoes(instances) { 
     const types = [];
-    for(let c=0; c< 10; c++)
+    for(let c=0; c < repetions; c++)
         ((value) => {
             const type = typeof value;
             if(! types.includes(type))
                 types.push(type);
             it(`anything goes, including ${JSON.stringify(value)}`,function(done) {
-                assert(true);
+                assert.doesNotThrow(() => jsonTypeOf(value));
                 done();
         })
     })(instances.next().value);
@@ -225,14 +263,14 @@ function anythingGoes(instances) {
  */
 function nothingButType(instances,type) {
 
-    for(let c=0; c< 10; c++)
+    for(let c=0; c< repetions; c++)
         ((value) => {
             it(`anything but a ${type}, such as ${JSON.stringify(value)}`,function(done) {
-                assert(typeof value !== type);
+                assert.notEqual(jsonTypeOf(value),type);
                 done();
             });
         })(instances.next().value);
-    }
+}
 
 /**
  * Check that no instance is ever generated

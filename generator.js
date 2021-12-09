@@ -40,6 +40,7 @@ const DEFAULT_MAXIMUM    = 5;
 const JSON_TYPES = [ "null", "boolean","number", "string", "array", "object" ];   
 
 
+
 class JSONGenerator {
 
     constructor(jsonSchema) {
@@ -276,31 +277,33 @@ class JSONGenerator {
         const schema    = {
             minItems: 0,
             maxItems: DEFAULT_MAX_ITEMS,
-            items: true,
             ...jsonSchema
         };
+        const items = schema.items || ( non  ? null : true ) ; 
 
-        const instances = this.jsonGenerator(schema.items);
-    
-        while(true) {
-            const array = [];
-    
-            for(let c = 0; c <= schema.maxItems; c++) {
-                if(c < schema.minItems) {
-                    if(non)
+        if (items) {
+            const instances = items ? this.jsonGenerator(items) : null;
+
+            while (true) {
+                const array = [];
+
+                for (let c = 0; c <= schema.maxItems; c++) {
+                    if (c < schema.minItems) {
+                        if (non)
+                            yield JSONGenerator.clone(array);
+                    } else if (c > schema.maxItems) {
+                        if (non)
+                            yield JSONGenerator.clone(array);
+                    } else if (non) {
+                        // check other kinds of array restrictions (e.g. uniqueElements)
+                    } else {
                         yield JSONGenerator.clone(array);
-                } else if(c > schema.maxItems) {
-                    if(non)
-                        yield JSONGenerator.clone(array);
-                } else if(non) {
-                    // check other kinds of array restrictions (e.g. uniqueElements)
-                } else {
-                    yield JSONGenerator.clone(array);
+                    }
+
+                    array.push(instances.next().value);
                 }
-
-                array.push(instances.next().value);
             }
-        }    
+        }
     }
 
     
@@ -314,30 +317,24 @@ class JSONGenerator {
         const schema    = {
             minProperties: 0,
             maxProperties: Number.MAX_VALUE,
-            properties: {},
             required: [],
             ...jsonSchema,
         };
+        const properties =  schema.properties || ( non ? null : [] );
 
-        if(Object.keys(schema.properties).length == 0) {
-            // no properties defined -> generates the empty object
-            // TODO: should property names be generated?
-            while(true)
-                yield {};
-
-        } else {
+        if( properties) {
 
             const iterators = {};
 
-            for (const p in schema.properties)
-                iterators[p] = this.jsonGenerator(schema.properties[p]);
+            for (const p in properties)
+                iterators[p] = this.jsonGenerator(properties[p]);
 
             while (true) {
                 const value = {};
                 let count = 0;
                 let still = schema.required;
 
-                for (const p in schema.properties) {
+                for (const p in properties) {
                     value[p] = iterators[p].next().value;
                     count++;
                     still = still.filter((s) => s !== p);
@@ -373,10 +370,36 @@ class JSONGenerator {
         return JSON.parse(JSON.stringify(value));
     }
 
+    /**
+     *  JSON type of given object
+     * 
+     * @param {*} value 
+     * @returns 
+     */
+     static jsonTypeOf(value) {
+        const baseType = typeof value;
+ 
+        switch(baseType) {
+            case "object":
+                if(value === null)
+                    return "null";
+                else if(Array.isArray(value))
+                    return "array";
+                else
+                    return "object";
+            case "boolean":
+            case "number":
+            case "string":
+                return baseType;
+            default:
+                throw new Error("Value without a JSON type:"+value);
+        }
+    }
 }
 
-
 module.exports = {
+    jsonTypeOf: JSONGenerator.jsonTypeOf,
+
     instances: function*(schema) {
         const generator = new JSONGenerator(schema)
 
