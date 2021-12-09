@@ -6,8 +6,6 @@ const { jsonTypeOf, instances, nonInstances }  = require('../generator.js');
  */
 const repetions= 10;
 
-describe('non booleans', () => nothingButType(nonInstances({ "type": "boolean" }),"boolean") );
-
 
 describe('Static methods',() => {
     describe('JSON type', () => {
@@ -103,6 +101,11 @@ describe('Numbers', function() {
     
     describe('non numbers', () => nothingButType(nonInstances({ "type": "number" }),"number") );
     
+    describe('number not between 2 and 4 ', () => theseWillGo(nonInstances({
+         "type": "number",
+         "minimum": 2,
+         "maximum": 4
+        }), [ 0, 6 ]));
 });
 
 
@@ -206,7 +209,6 @@ describe('Objects', function() {
     describe('non objects', () => nothingButType(nonInstances({ "type": "object" }),"object") );
 
 });
-
 
 
 /*----------------*\

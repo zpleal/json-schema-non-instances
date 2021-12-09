@@ -172,21 +172,21 @@ class JSONGenerator {
     }
 
     /**
-     * Generates (non) instance objects of given JSON Schema 
+     * Generates (non) instance null objects of given JSON Schema 
      * 
      * @param {*} jsonSchema a JSON Schema object (ignored for booleans)
      * @param {*} non if true generates a non instance   
      */
     *nullGenerator(_,non) {
         if(non)
-            this.anyGenerator();
+            return;
         else
             while(true) 
                 yield null;
     } 
 
     /**
-     * Generates (non) instance objects of given JSON Schema 
+     * Generates (non) instance booleans of given JSON Schema 
      * 
      * @param {*} jsonSchema a JSON Schema object (ignored for booleans)
      * @param {*} non if true generates a non instance   
@@ -218,9 +218,9 @@ class JSONGenerator {
             const more = schema.maximum || schema.maximum;
 
             if(typeof less === "number")
-                yield minimum - 2;
+                yield less - 2;
             if(typeof more === "number")
-                yield maximum + 2
+                yield more + 2
 
         } else {
             const start = schema.minimumExclusive + 1 || schema.minimum || DEFAULT_MINIMUM
@@ -234,35 +234,40 @@ class JSONGenerator {
     }
 
     /**
-     * Generates (non) instance string for given JSON Schema
+     * Generates (non) instance strings for given JSON Schema
      * 
      * @param {*} jsonSchema a JSON Schema object
      * @param {*} non if true generates a non-instance
      */
     *stringGenerator (jsonSchema,non) {
         const schema = {
-            minLength: 0,
-            maxLength: DEFAULT_MAX_LENGTH,
             pattern:   "",
             ...jsonSchema
         }
 
-        while(true) {
-            let value = ""
+        if( non && ! ( schema.minLength || schema.maxLength ))
+            return;
+        else {
+            const minLength = schema.minLength || 0
+            const maxLength = schema.maxLength || DEFAULT_MAX_LENGTH;
 
-            for(let c=0; c <= schema.maxLength; c++) {
-                if(c < schema.minLength) {
-                    if(non)
-                        yield value;
-                } else if(c > schema.maxLength) {
-                    if(non)
-                        yield value;
-                } else if(non) {
-                    // check other string constraints (e.g. pattern)
-                } else 
-                    yield value;
+            while(true) {
+                let value = ""
 
-                value += "a";
+                for(let c=0; c <= maxLength + 1 ; c++) {
+                    if(c < minLength) {
+                        if(non)
+                            yield value;
+                    } else if(c > maxLength) {
+                        if(non)
+                            yield value;
+                    } else if(non) {
+                        // check other string constraints (e.g. pattern)
+                    } else 
+                        yield value;
+
+                    value += "a";
+                }
             }
         }
     }
@@ -334,24 +339,28 @@ class JSONGenerator {
                 let count = 0;
                 let still = schema.required;
 
-                for (const p in properties) {
-                    value[p] = iterators[p].next().value;
-                    count++;
-                    still = still.filter((s) => s !== p);
+                if( properties.length === 0 && still.length === 0)
+                    yield value;
+                else {
+                    for (const p in properties) {
+                        value[p] = iterators[p].next().value;
+                        count++;
+                        still = still.filter((s) => s !== p);
 
-                    if (count < schema.minProperties) {
-                        if (non)
+                            if (count < schema.minProperties) {
+                            if (non)
+                                yield JSONGenerator.clone(value);
+                        } else if (count > schema.maxProperties) {
+                            if (non)
+                                yield value;
+                        } else if (still.length > 0) {
+                            if (non)
+                                yield JSONGenerator.clone(value);
+                        } else if (non) {
+                            //TODO check other objects restrictions (e.g. propertyNames)
+                        } else {
                             yield JSONGenerator.clone(value);
-                    } else if (count > schema.maxProperties) {
-                        if (non)
-                            yield value;
-                    } else if (still.length > 0) {
-                        if (non)
-                            yield JSONGenerator.clone(value);
-                    } else if (non) {
-                        //TODO check other objects restrictions (e.g. propertyNames)
-                    } else {
-                        yield JSONGenerator.clone(value);
+                        }
                     }
                 }
             }
