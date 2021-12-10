@@ -51,12 +51,8 @@ describe('Enum', function() {
 
     describe('Enumerate non intances of full words', function() {
 
-        theseWillGo(nonInstances({ "enum": [ "Hello", "World"]}),[ 
-            "ello", "Hllo", "Helo", "Helo", "Hell", 
-            "orld", "Wrld", "Wold", "Word", "Worl",
-            "ello", "Hllo", "Helo", "Helo", "Hell",
-            "orld", "Wrld", "Wold", "Word", "Worl"
-        ]);
+        checkWith(nonInstances({ "enum": [ "Hello", "World"]}),(value) => ! [ "Hello", "World" ].includes(value));
+
     });
 });
 
@@ -75,8 +71,8 @@ describe('All or nothing',function() {
 
 describe('Booleans', function() {
 
-  describe('all boolean values', () => theseWillGo(instances({ "type": "boolean"}),
-    [true, false, true, false,true,false]));
+  describe('all boolean values', () => checkWith(instances({ "type": "boolean"}), 
+    (value) => value === true || value === false ));
 
    describe('non booleans', () => nothingButType(nonInstances({ "type": "boolean" }),"boolean") );
 
@@ -101,11 +97,11 @@ describe('Numbers', function() {
     
     describe('non numbers', () => nothingButType(nonInstances({ "type": "number" }),"number") );
     
-    describe('number not between 2 and 4 ', () => theseWillGo(nonInstances({
+    describe('anything but numbers between 2 and 4', () => checkWith(nonInstances({
          "type": "number",
          "minimum": 2,
          "maximum": 4
-        }), [ 0, 6 ]));
+        }), (value) => (typeof value === "number" ? (value < 2 || value > 4) : true)));
 });
 
 
@@ -215,6 +211,20 @@ describe('Objects', function() {
  |  Utilities     |
  \*---------------*/
 
+ /**
+  * Check if the generated instances are validated by given function .
+  * @param {*} instances to check
+  * @param {*} checker for instances
+  */
+function checkWith(instances,checker) {
+    for(let c=0; c < repetions; c++)
+    ((value) => {
+        it(`${JSON.stringify(value)} tested with ${checker}`, function (done) {
+            assert(checker(value))
+            done();
+        });
+    })(instances.next().value);
+}
 
  /**
   * Check if the generated instances corresponde to the given sequence.
@@ -223,16 +233,17 @@ describe('Objects', function() {
   * @param {*} instances 
   * @param {*} sequence 
   */
-function theseWillGo(instances,sequence) {
-    for(item of sequence) 
-        ((value,expected) => {
-            it(`expected ${JSON.stringify(expected)}`,function(done) {
-                assert.deepEqual(value,expected)
+function theseWillGo(instances, sequence) {
+
+    for (item of sequence)
+        ((value, expected) => {
+            it(`expected ${JSON.stringify(expected)}`, function (done) {
+                assert.deepEqual(value, expected)
                 done();
             });
-        })(instances.next().value,item);
-}
+        })(instances.next().value, item);
 
+}
 
 /**
  * Check that many instances of different types are generated
