@@ -37,6 +37,23 @@ describe('Static methods',() => {
     });
 });
 
+describe('Const', function() {
+    describe('The usual constant :-)', function() {
+        const label = "Hello World!";
+        checkWith(instances({ "const": label}), (value) => value === label );
+    });
+
+    describe('A small contant', function() {
+        const label = "e";
+        checkWith(instances({ "const": label}), (value) => value === label );
+    });
+
+    describe('An empty contant', function() {
+        const label = "";
+        checkWith(instances({ "const": label}), (value) => value === label );
+    });
+});
+
 describe('Enum', function() {
     describe('Enumerate single character words', function() {
         const enumeration = [ "a", "b", "c"];
@@ -74,7 +91,7 @@ describe('Booleans', function() {
   describe('all boolean values', () => checkWith(instances({ "type": "boolean"}), 
     (value) => value === true || value === false ));
 
-   describe('non booleans', () => nothingButType(nonInstances({ "type": "boolean" }),"boolean") );
+   describe('non booleans', () => nothingWithType(nonInstances({ "type": "boolean" }),"boolean") );
 
 });
 
@@ -95,7 +112,7 @@ describe('Numbers', function() {
         }),[0,2,4,6,8,10]));
 
     
-    describe('non numbers', () => nothingButType(nonInstances({ "type": "number" }),"number") );
+    describe('non numbers', () => nothingWithType(nonInstances({ "type": "number" }),"number") );
     
     describe('anything but numbers between 2 and 4', () => checkWith(nonInstances({
          "type": "number",
@@ -125,7 +142,7 @@ describe('Strings', function() {
             }), [ "aaaa", "aaaaa", "aaaaaa", "aaaaaaa", 
                   "aaaa", "aaaaa", "aaaaaa", "aaaaaaa"] ));
 
-     describe('non strings', () => nothingButType(nonInstances({ "type": "string" }),"string") );
+     describe('non strings', () => nothingWithType(nonInstances({ "type": "string" }),"string") );
 });
 
 
@@ -151,7 +168,7 @@ describe('Arrays', function() {
             }),[ [3], [3,6], [3,6,9] ]));
             
  
-     describe('non arrays', () => nothingButType(nonInstances({ "type": "array" }),"array") );
+     describe('non arrays', () => nothingWithType(nonInstances({ "type": "array" }),"array") );
 });
 
 
@@ -202,10 +219,70 @@ describe('Objects', function() {
          ])
     );
 
-    describe('non objects', () => nothingButType(nonInstances({ "type": "object" }),"object") );
+    describe('non objects', () => nothingWithType(nonInstances({ "type": "object" }),"object") );
 
 });
 
+describe('Wromg types', function() {
+
+    describe('Invalid type in instances', () => {
+        assert.throws( () => instances({
+            "type": "this is not a valid type"
+        }).next(),{ name: "Error", message: /Invalid JSON type/ });
+    });
+
+    describe('Invalid type in non-instances', () => {
+        assert.throws( () => nonInstances({
+            "type": "this is not a valid type"
+        }).next(),{ name: "Error", message: /Invalid JSON type/ });
+    });
+});
+
+describe('Definitions', function() {
+
+    describe('definition with invalid path', () => {
+        assert.throws( () => instances({
+            "definitions": {
+                "aDefinition": {
+                    "$id":  "someId"
+                }
+            },
+            "$ref": "#/definitions/wrongDefinition"
+        }).next(),{ name: "Error", message: /invalid path/ });
+    });
+
+
+    describe('definition with missing $id', () => {
+        assert.throws( () => instances({
+            "definitions": {
+                "aDefinition": {
+                    "$id":  "someId"
+                }
+            },
+            "$ref": "wrongId"
+        }).next(),{ name: "Error", message: /not found/ });
+    });
+
+    describe('boolean definition using path', () => checkWith(instances({
+        "definitions": {
+            "myBoolean": {
+                "type": "boolean"
+            }
+        },
+        "$ref": "#/definitions/myBoolean"}), 
+    (value) => value === true || value === false ));
+
+    describe('boolean definition using $id', () => checkWith(instances({
+        "definitions": {
+            "myBoolean": {
+                "$id":  "myBooleanId",
+                "type": "boolean"
+            }
+        },
+        "$ref": "myBooleanId"}), 
+    (value) => value === true || value === false ));
+
+});
 
 /*----------------*\
  |  Utilities     |
@@ -274,7 +351,7 @@ function anythingGoes(instances) {
  * @param {*} instances 
  * @param {*} type 
  */
-function nothingButType(instances,type) {
+function nothingWithType(instances,type) {
 
     for(let c=0; c< repetions; c++)
         ((value) => {

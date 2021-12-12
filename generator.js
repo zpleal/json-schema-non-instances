@@ -6,9 +6,10 @@
  *  Non-instances are useful for JSON Schema validation in          *
  *  automated assessment.                                           *
  *                                                                  *
- *  This module exposes a function with 2 arguments:                *
- *     * a JSON Schema to generate instances                        *
- *     * a boolean - when true generates a non-instance             *
+ *  This module exposes 2 functions to generate:                      *
+ *     * instances                                                  *
+ *     * non-instances                                              *
+ * from given JSON schema                                           *               
  *                                                                  *
  *  It either generates an infinite cyclical sequence               *
  *  of (non)instances or nothing at all, if none exists.            *
@@ -17,27 +18,28 @@
  *                                         December 2021            *   
 \********************************************************************/
 
+
 /**
  * Default maxLength for strings
  */
 const DEFAULT_MAX_LENGTH = 2;
 /**
  * Default maxItems for arrays
- */  
-const DEFAULT_MAX_ITEMS  = 5;
+ */
+const DEFAULT_MAX_ITEMS = 5;
 /**
  * Default minimum for numbers
  */
-const DEFAULT_MINIMUM    = 0;
+const DEFAULT_MINIMUM = 0;
 /**
  * Default maximum for numbers
  */
-const DEFAULT_MAXIMUM    = 5;
+const DEFAULT_MAXIMUM = 5;
 /**
  * Names of JSON types.
  * Thers is a generator funtion for each of them.
  */
-const JSON_TYPES = [ "null", "boolean","number", "string", "array", "object" ];   
+const JSON_TYPES = ["null", "boolean", "number", "string", "array", "object"];
 
 
 
@@ -52,92 +54,173 @@ class JSONGenerator {
     }
 
     *nonInstances() {
-        yield* this.jsonGenerator(this.jsonSchema,true);
+        yield* this.jsonGenerator(this.jsonSchema, true);
     }
 
-    *jsonGenerator(jsonSchema,non) {
-         switch(typeof jsonSchema) {
-            case "boolean": 
+    *jsonGenerator(jsonSchema, non) {
+        switch (typeof jsonSchema) {
+            case "boolean":
                 yield* this.anyGenerator(jsonSchema, !jsonSchema || non);
                 break;
             case "object":
-                if(jsonSchema === null)
-                    yield* this.anyGenerator(jsonSchema,non);
-                else if("type" in jsonSchema)
-                    yield* this.generateFromType(jsonSchema,non);
-                else if("enum" in jsonSchema)
-                    yield* this.generateFromEnum(jsonSchema,non);
-                else if("$ref" in jsonSchema)
-                    yield* this.generateFromRef(jsonSchema,non);
+                if (jsonSchema === null)
+                    yield* this.anyGenerator(jsonSchema, non);
+                else if ("type" in jsonSchema)
+                    yield* this.generateFromType(jsonSchema, non);
+                else if ("enum" in jsonSchema)
+                    yield* this.generateFromEnum(jsonSchema, non);
+                else if ("const" in jsonSchema)
+                    yield* this.generateFromConst(jsonSchema, non);
+                else if ("$ref" in jsonSchema)
+                    yield* this.generateFromRef(jsonSchema, non);
                 else
                     yield* this.anyGenerator(jsonSchema, non);
-            }
-    }
-
-    *generateFromRef(jsonSchema,non) {
-        yield* this.jsonGenerator(this.getDefinition(jsonSchema.$ref),non);
-
-    }
-
-    getDefinition(ref) {
-        const [ url , pointer ]  = ref.split("#");
-        const schema = url === "" ? this.jsonSchem : this.getSchemaFromURL(url);
-        
-        if(pointer == "")
-            throw new Error("Not implemented yet");
-        else if(pointer[0] === "/") {
-            const path = pointer.split("/");
-            let node = schema;
-
-            path.forEach(property => {
-                if(property in node)
-                    node = node[property];
-                else
-                    throw(`invalid path "${property}" in "${ref}"`);
-            });
-            return node;
-        } else {
-            throw new Error("Not implemented yet");
         }
+    }
+
+    /**
+     * Generate (non)-instances for given JSON Schema 
+     * @param {*} jsonSchema 
+     * @param {*} non 
+     */
+    *generateFromRef(jsonSchema, non) {
+        yield* this.jsonGenerator(this.getDefinition(jsonSchema.$ref), non);
+
+    }
+
+    /**
+     * Definition in this JSON Schema with given $ref 
+     * @param {*} ref of intended definition
+     * @returns definiton 
+     */
+    getDefinition(ref) {
+        const { url, pointer } = JSONGenerator.parseRef(ref);
+        const schema = url === "" ? this.jsonSchema : this.getSchemaFromURL(url);
+
+        if (pointer == "")
+            throw new Error("Not implemented yet");
+        else if (pointer[0] === "/") 
+            return JSONGenerator.getPathDefinition(pointer,schema);
+        else 
+            return JSONGenerator.getIdDefinition(pointer,schema);
+    }
+
+    /**
+     * Parse a reference into a url and a pointer
+     * @param {*} ref string
+     * @returns object with url and pointer as properties
+     */
+    static parseRef(ref) {
+        let url = "";
+        let pointer = "";
+
+        if(ref.includes("#")) 
+            [ url, pointer ] = ref.split("#");
+        else 
+            pointer = ref;
+
+        return { url, pointer };
+    }
+
+    /**
+     * Definition with given pathname in given JSON schema
+     * @param {*} pathname of definition
+     * @param {*} schema containing definiton
+     * @returns definition
+     */
+    static getPathDefinition(pathname,schema) {
+        const path = pathname.substring(1).split("/");
+        let node = schema;
+
+        path.forEach(property => {
+            if (property in node)
+                node = node[property];
+            else
+                 throw new Error(`invalid path "${property}" in "${pathname}"`);
+        });
+        return node;
+    }
+
+    /**
+     * Definition in this JSON schema with given ID 
+     * @param {*} id of intended definition
+     * @param {*} schema containing definiton
+     * @returns definition
+     */
+    static getIdDefinition(id,schema) {
+        const definitions = schema.definitions;
+
+        if (definitions) {
+            const withId = [];
+
+            for(const name in definitions) {
+                const definition = definitions[name];
+
+                if("$id" in definition && definition.$id === id)
+                    withId.push(definition);
+            }
+
+            switch(withId.length) {
+                case 0: throw new Error(`$id not found: ${id}`); 
+                case 1: return withId[0];
+                default: throw new Error(`Multiple definitions with $id: ${id}`);
+            }
+        } else
+            throw new Error("definitions not found in JSON schema");
     }
 
     getSchemaFromURL(url) {
         throw new Error("Not implemented yet");
     }
 
-   
+    *generateFromConst(jsonSchema, non) {
+        const label = jsonSchema.const
+
+        while(true)
+            if(non) {
+                if(label.length > 0) {
+                    for (const char of label) 
+                        yield label.replace(char, '');
+                } else {
+                    for (const char of "label")
+                        yield char;
+                }
+            } else
+                yield label;
+    }
+
     /**
      * Generates (non) instances from enumeration
      */
-    *generateFromEnum(jsonSchema,non) {
-        while(true)
-            for(const value of jsonSchema.enum)
-                if(non) { 
-                    for(const char of value) {
-                        const wrong = value.replace(char,'');
-                        if(! jsonSchema.enum.includes(wrong))
+    *generateFromEnum(jsonSchema, non) {
+        while (true)
+            for (const value of jsonSchema.enum)
+                if (non) {
+                    for (const char of value) {
+                        const wrong = value.replace(char, '');
+                        if (!jsonSchema.enum.includes(wrong))
                             yield wrong;
                     }
                 } else
                     yield value;
     }
 
-    *generateFromType(jsonSchema,non) {
-        if(JSON_TYPES.includes(jsonSchema.type)) {
-            const generator = this[jsonSchema.type+"Generator"].bind(this);
+    *generateFromType(jsonSchema, non) {
+        if (JSON_TYPES.includes(jsonSchema.type)) {
+            const generator = this[jsonSchema.type + "Generator"].bind(this);
 
-            if(non) {
+            if (non) {
                 const other = JSON_TYPES
                     .filter((n) => n !== jsonSchema.type)
-                    .map(n => this[n+"Generator"].call(this));
-        
-                if(generator)
-                    other.unshift(generator(jsonSchema,non));
-        
+                    .map(n => this[n + "Generator"].call(this));
+
+                if (generator)
+                    other.unshift(generator(jsonSchema, non));
+
                 yield* this.combine(other);
-            } else 
+            } else
                 yield* generator(jsonSchema);
-        } else 
+        } else
             throw new Error(`Invalid JSON type ${jsonSchema.type}`);
     }
 
@@ -147,12 +230,12 @@ class JSONGenerator {
      * @param {*} generators 
      */
     *combine(generators) {
-        while(true)
-            for(const generator of generators) {
+        while (true)
+            for (const generator of generators) {
                 const next = generator.next();
-            
-                if(!next.done)
-                    yield next.value;  
+
+                if (!next.done)
+                    yield next.value;
             }
     }
 
@@ -163,12 +246,12 @@ class JSONGenerator {
      * @param {*} jsonSchema a JSON Schema object (ignored for null)
      * @param {*} non if true generates a non instance   
      */
-    *anyGenerator(_,non) {
-        if(non) {
+    *anyGenerator(_, non) {
+        if (non) {
             // no JSON object
         } else
             yield* this.combine(
-                JSON_TYPES.map(n => this[n+"Generator"].bind(this)()));
+                JSON_TYPES.map(n => this[n + "Generator"].bind(this)()));
     }
 
     /**
@@ -177,13 +260,13 @@ class JSONGenerator {
      * @param {*} jsonSchema a JSON Schema object (ignored for booleans)
      * @param {*} non if true generates a non instance   
      */
-    *nullGenerator(_,non) {
-        if(non)
+    *nullGenerator(_, non) {
+        if (non)
             return;
         else
-            while(true) 
+            while (true)
                 yield null;
-    } 
+    }
 
     /**
      * Generates (non) instance booleans of given JSON Schema 
@@ -191,15 +274,15 @@ class JSONGenerator {
      * @param {*} jsonSchema a JSON Schema object (ignored for booleans)
      * @param {*} non if true generates a non instance   
      */
-    *booleanGenerator(_,non) {
-        if(non)
+    *booleanGenerator(_, non) {
+        if (non)
             return;
         else
-            while(true) {
+            while (true) {
                 yield true;
                 yield false;
             }
-    } 
+    }
 
 
     /**
@@ -208,27 +291,27 @@ class JSONGenerator {
      * @param {*} jsonSchema a JSON Schema object
      * @param {*} non if true generates a non-instance
      */
-    *numberGenerator(jsonSchema,non) {
+    *numberGenerator(jsonSchema, non) {
         const schema = {
             ...jsonSchema
         };
 
-        if(non) { // just 2 examples, if limits where define
+        if (non) { // just 2 examples, if limits where define
             const less = schema.minimum || schema.minimumExclusive;
             const more = schema.maximum || schema.maximum;
 
-            if(typeof less === "number")
+            if (typeof less === "number")
                 yield less - 2;
-            if(typeof more === "number")
+            if (typeof more === "number")
                 yield more + 2
 
         } else {
             const start = schema.minimumExclusive + 1 || schema.minimum || DEFAULT_MINIMUM
-            const stop  = schema.maximumExclusive - 1 || schema.maximum || DEFAULT_MAXIMUM ;
-            const step  = schema.multiple || 1;
+            const stop = schema.maximumExclusive - 1 || schema.maximum || DEFAULT_MAXIMUM;
+            const step = schema.multiple || 1;
 
-            while(true)
-                for(let value = start; value <= stop; value += step)
+            while (true)
+                for (let value = start; value <= stop; value += step)
                     yield value;
         }
     }
@@ -239,31 +322,31 @@ class JSONGenerator {
      * @param {*} jsonSchema a JSON Schema object
      * @param {*} non if true generates a non-instance
      */
-    *stringGenerator (jsonSchema,non) {
+    *stringGenerator(jsonSchema, non) {
         const schema = {
-            pattern:   "",
+            pattern: "",
             ...jsonSchema
         }
 
-        if( non && ! ( schema.minLength || schema.maxLength ))
+        if (non && !(schema.minLength || schema.maxLength))
             return;
         else {
             const minLength = schema.minLength || 0
             const maxLength = schema.maxLength || DEFAULT_MAX_LENGTH;
 
-            while(true) {
+            while (true) {
                 let value = ""
 
-                for(let c=0; c <= maxLength + 1 ; c++) {
-                    if(c < minLength) {
-                        if(non)
+                for (let c = 0; c <= maxLength + 1; c++) {
+                    if (c < minLength) {
+                        if (non)
                             yield value;
-                    } else if(c > maxLength) {
-                        if(non)
+                    } else if (c > maxLength) {
+                        if (non)
                             yield value;
-                    } else if(non) {
+                    } else if (non) {
                         // check other string constraints (e.g. pattern)
-                    } else 
+                    } else
                         yield value;
 
                     value += "a";
@@ -278,13 +361,13 @@ class JSONGenerator {
      * @param {*} jsonSchema a JSON Schema object
      * @param {*} non if true generates a non-instance
      */
-    *arrayGenerator(jsonSchema,non) {
-        const schema    = {
+    *arrayGenerator(jsonSchema, non) {
+        const schema = {
             minItems: 0,
             maxItems: DEFAULT_MAX_ITEMS,
             ...jsonSchema
         };
-        const items = schema.items || ( non  ? null : true ) ; 
+        const items = schema.items || (non ? null : true);
 
         if (items) {
             const instances = items ? this.jsonGenerator(items) : null;
@@ -311,23 +394,23 @@ class JSONGenerator {
         }
     }
 
-    
+
     /**
     * Generates (non) instance objects for given JSON Schema
     * 
     * @param {*} jsonSchema a JSON Schema object
     * @param {*} non if true generates a non-instance
     */
-    *objectGenerator(jsonSchema,non) {
-        const schema    = {
+    *objectGenerator(jsonSchema, non) {
+        const schema = {
             minProperties: 0,
             maxProperties: Number.MAX_VALUE,
             required: [],
             ...jsonSchema,
         };
-        const properties =  schema.properties || ( non ? null : [] );
+        const properties = schema.properties || (non ? null : []);
 
-        if( properties) {
+        if (properties) {
 
             const iterators = {};
 
@@ -339,7 +422,7 @@ class JSONGenerator {
                 let count = 0;
                 let still = schema.required;
 
-                if( properties.length === 0 && still.length === 0)
+                if (properties.length === 0 && still.length === 0)
                     yield value;
                 else {
                     for (const p in properties) {
@@ -347,7 +430,7 @@ class JSONGenerator {
                         count++;
                         still = still.filter((s) => s !== p);
 
-                            if (count < schema.minProperties) {
+                        if (count < schema.minProperties) {
                             if (non)
                                 yield JSONGenerator.clone(value);
                         } else if (count > schema.maxProperties) {
@@ -385,14 +468,14 @@ class JSONGenerator {
      * @param {*} value 
      * @returns 
      */
-     static jsonTypeOf(value) {
+    static jsonTypeOf(value) {
         const baseType = typeof value;
- 
-        switch(baseType) {
+
+        switch (baseType) {
             case "object":
-                if(value === null)
+                if (value === null)
                     return "null";
-                else if(Array.isArray(value))
+                else if (Array.isArray(value))
                     return "array";
                 else
                     return "object";
@@ -401,7 +484,7 @@ class JSONGenerator {
             case "string":
                 return baseType;
             default:
-                throw new Error("Value without a JSON type:"+value);
+                throw new Error("Value without a JSON type:" + value);
         }
     }
 }
@@ -409,13 +492,13 @@ class JSONGenerator {
 module.exports = {
     jsonTypeOf: JSONGenerator.jsonTypeOf,
 
-    instances: function*(schema) {
+    instances: function* (schema) {
         const generator = new JSONGenerator(schema)
 
         yield* generator.instances();
     },
 
-    nonInstances: function*(schema) {
+    nonInstances: function* (schema) {
         const generator = new JSONGenerator(schema)
 
         yield* generator.nonInstances();
