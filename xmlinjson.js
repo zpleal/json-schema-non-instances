@@ -1,72 +1,139 @@
+/********************************************************************\
+ *  XML in JSON (XiJ or xij) is a JSON representation of XML        * 
+ *                                                                  *
+ * It intends to represent XML documents in JSON to processed       *
+ * them in JavaScript, including XML features such as:              *
+ *                                                                  *
+ *   - mixed content                    V                           *
+ *   - namespaces                       X                           *
+ *   - different node types                                         *
+ *           text                       V                           *
+ *           element                    V
+ *           comment,                   V
+ *           processing instruction     V
+ *
+ *                                                                  *        
+ * Document in XIJ are in general larger than their XML conterparts.*     
+ * That's a feture, not a bug.                                      *                                                   
+ *                                                                  +
+ *                                                                  *  
+ *                                         José Paulo Leal          * 
+ *                                         December 2021            *   
+\********************************************************************/
 
+const { Buffer } = require('buffer');
 
-function serialize(JSON) {
-    const builder = "";
+function serialize(json) {
 
-    makeNode(JSON,builder);
-    return builder;
+    offset = 0;
+    makeNode(json);
+    return BUILDER.toString('utf-8',0,offset);
 }
 
-function makeNode(node,builder) {
+const BUFFER_SIZE = 1024;
+const BUILDER = Buffer.alloc(BUFFER_SIZE);
+let offset = 0;
+
+function write(value) {
+    const text   = typeof value === "string" ? value : value.toString();
+    const length = text.length;
+
+    if(text.length + offset > BUFFER_SIZE)
+        throw new Error("Buffer size exceeeded");
+    
+    BUILDER.write(text,offset);
+    offset += text.length;
+}
+
+function makeNode(node) {
 
     switch(typeof node) { 
-        case "string":
-            builder += node;
-            break;
         case "object":
             if("element" in node)
-                makeElement(node,builder);
+                makeElement(node);
             else if("comment" in node)
-                makeComment(node,builder);
-            else if("processingInstruction" in mode)
-                makeProcessingInstruction(node,builder);
+                makeComment(node);
+            else if("processingInstruction" in node)
+                makeProcessingInstruction(node);
             else if("dtdDeclaration" in node)
-                makeDTDDeclaration(node,builder);
+                makeDTDDeclaration(node);
             else
-            throw new Error("Invalid XML node type in JSON");    
+                throw new Error(`Invalid node type (missing "element"?) in ${JSON.stringify(node)}`);    
             break;
         default:
-            throw new Error("Invalid XML in JSON");
+            write(node);
+            break;
     }
 }
 
-function makeElement({element,attributes,content},builder) {
-    const empty = content.length == 0;
+function makeElement({element,attributes,content}) {
+    const empty = content ? content.length == 0 : true;
 
-    makeTag(element,attributes, empty ? 'EMPTY': 'START',builder);
-    if(content)
-        content.forEach( (child) => makeNode(child) );
+    makeTag(element,attributes, empty ? 'EMPTY': 'START');
+    if(content) {
+        if(Array.isArray(content))
+            content.forEach( (child) => makeNode(child) );
+        else
+            throw new Error(`Content must be an array; cannot be: ${content}`);
+    }
     if(!empty)
-        makeTag(element,null, 'END',builder);
+        makeTag(element,null, 'END');
 }
 
-function makeComment({comment},builder) {
-    builder += `<!--${comment}-->`
+function makeComment({comment}) {
+    write(`<!--${comment}-->`);
 }
 
-function makeProcessingInstruction({processingIntruction,attributes},builder) {
-    builder += `<?${processingIntruction}`
-    makeAttributes(attributes,builder);
-    builder +=  `?>`
+function makeProcessingInstruction({processingInstruction,attributes}) {
+    write(`<?xml-${processingInstruction}`);
+    makeAttributes(attributes);
+    write(`?>`);
 }
 
 
-function makeTag(name,attributes,kind,builder) {
-    builder += `<${kind == 'END' ? '/' : ''}${name}`
-    makeAttributes(attributes,builder);
-    builder += `${kind == 'EMPTY' ? '/' : ''}`
+function makeTag(name,attributes,kind) {
+    write(`<${kind == 'END' ? '/' : ''}${name}`);
+    makeAttributes(attributes);
+    write(`${kind == 'EMPTY' ? '/' : ''}>`);
 }
 
-function makeAttributes(attributes,builder) {
+/**
+ * 
+ * @param {*} attributes 
+ */
+function makeAttributes(attributes) {
     if(attributes) {
-        for(const name in attributes)
-            builder += ` ${name}="${value}"`
+        if(typeof attributes === "object") {
+            for(const name in attributes) {
+                const value = attributes[name];
+                const sep   = bestDelimiter(value);
+                write(` ${name}=${sep}${value}${sep}`);
+            }
+        } else {
+            throw new Error(`Attributes must be an object, cannot be: ${attributes}`)
+        }
     }
 }
 
-modules.export = {
+/**
+ * Choose the best delimiter for an attribute, depending on its content 
+ * Should be improved
+ * 
+ * @param {*} value of attribute
+ * @returns either a double quote (default) or a single quote
+ */
+function bestDelimiter(value) {
+    const text = typeof value === "string" ? value : value.toString();
+    const pos  = text.indexOf('\"');
 
-    parse: parse,
+    return (pos > -1 && text[pos-1] != '\\') ? '\'' : '\"' ;
+}
+
+
+
+// parse: parse,
+
+module.exports = {
 
     serialize: serialize
 };

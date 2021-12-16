@@ -68,6 +68,8 @@
  * 
  */
 
+const jsonGenerator  = require('../generator.js');
+const { serialize } = require('./xmlinjson.js');
 
 class DTDgenerator {
 
@@ -75,6 +77,30 @@ class DTDgenerator {
         this.dtdSchema = dtdSchema;
     }
 
+    /**
+     * Instances of this DTD
+     */
+    *instances() {
+        const jsonSchema = this.getJsonSchema();
+
+        for(const json of jsonGenerator.instances( jsonSchema ) ) 
+            yield serialize(json);
+    }
+
+    /**
+     * Instances of this DTD
+     */
+     *nonInstances() {
+        const jsonSchema = this.getJsonSchema();
+
+        for(const json of jsonGenerator.instances( jsonSchema ) ) 
+            yield serialize(json);
+    }
+
+    /**
+     * Non instances of this DTD
+     * 
+     */
     getJsonSchema() {
         const { root, defs } = DTDgenerator.parseDocType(this.dtdSchema)
         const jsonSchema = {};
@@ -189,4 +215,32 @@ class DTDgenerator {
         else
             return;
     }   
+
+    static parseModel(model) {
+        const jsonType = { "type": "array" };
+
+        switch(model) {
+            case 'EMPTY':
+                jsonType.items = "false";
+                jsonType.maxContains = 0;
+                break;
+            case 'ANY':
+                jsonType.items = "true";
+                break;
+            case '(#PCDATA)':
+                jsonType.items = "string";
+                jsonType.maxContains = 1;
+                break;
+            case '(#RCDATA)':
+                throw new Error("Avoid using raw character data");
+            default:
+                const found = model.match(/\(#PCDATA\s+(|\s*\w+)+\)\*/);
+                if() 
+                    json.items = parseMixedContent(model);
+                else
+                    json.items = parseExpression(model);
+        }
+
+        return jsonType;
+    }
 }
