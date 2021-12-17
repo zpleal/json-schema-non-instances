@@ -68,6 +68,7 @@
  * 
  */
 
+const { type } = require('mocha/lib/utils');
 const jsonGenerator  = require('../generator.js');
 const { serialize } = require('./xmlinjson.js');
 
@@ -228,16 +229,19 @@ class DTDgenerator {
                 jsonType.items = "true";
                 break;
             case '(#PCDATA)':
-                jsonType.items = "string";
+                jsonType.items = { "type": "string" }+;
                 jsonType.maxContains = 1;
                 break;
             case '(#RCDATA)':
                 throw new Error("Avoid using raw character data");
             default:
-                const found = model.match(/\(#PCDATA\s+(|\s*\w+)+\)\*/);
-                if() 
-                    json.items = parseMixedContent(model);
-                else
+                const found = model.match(/\(\s*(#PCDATA(?:\s*\|\s*\w+)+)\s*\)\*/gm);
+                if(found) {
+                    const types = found[1]
+                        .split(/\s*\|\s*/)
+                        .map( (t) => t === "#PCDATA" ? { "type": "string" } : { "$ref": t } );
+                    json.items = { "anyOf": types};
+                } else
                     json.items = parseExpression(model);
         }
 
