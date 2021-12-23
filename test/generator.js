@@ -156,48 +156,50 @@ describe('Booleans', function() {
 });
 
 describe('Numbers', function() {
-    const schema = {
-        from5to10: { 
-            "type": "number",
-            "minimum": 5,
-            "maximum": 10,
-            "multiple": 1,
+    const examples = [
+        { 
+            description: "numbers from 5 to 10",
+            schema : { 
+                "type": "number",
+                "minimum": 5,
+                "maximum": 10,
+                "multiple": 1,
+            },
+            values:    [ 5, 6, 7, 8, 9, 10],
+            nonValues: [ 2, 3, 4, 11, 12]
         },
-        evenLess10: { 
-            "type": "number",
-            "minimum": 0,
-            "maximum": 10,
-            "multiple": 2,
+        {
+            description: "event numbers less than 10",
+            schema: { 
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10,
+                "multiple": 2,
+            },
+            values: [ 0, 2, 4, 6, 8, 10],
+            nonValues: [ 1, 3, 5, 7, 9, 11, 13 ]
         }
-    }
-    const values = {
-        from5to10:  [ 5, 6, 7, 8, 9, 10],
-        evenLess10: [ 0, 2, 4, 6, 8, 10]
-    }
-    const nonValues = {
-        from5to10:  [ 2, 3, 4, 11, 12],
-        evenLess10: [ 1, 3, 5, 7, 9, 11, 13 ]
-    }
+    ];
 
-    for(const kind of [ "from5to10", "evenLess10"]) {
+    for(const example of examples) {
 
-        for(let value of values[kind])
-            it(`validate ${value} as ${kind}`, 
-                (done) => { assert(validate(schema[kind],value)); done(); });
+        for(let value of example.values)
+            it(`validate ${value} as ${example.description}`, 
+                (done) => { assert(validate(example.schema,value)); done(); });
 
-        for(let value of nonValues[kind])
-            it(`invalidate ${value} as ${kind}`, 
-                (done) => { assert(! validate(schema[kind],value)); done(); });
+        for(let value of example.nonValues)
+            it(`invalidate ${value} as ${example.description}`, 
+                (done) => { assert(! validate(example.schema,value)); done(); });
 
-        describe(`generate instances as ${kind}`, 
-            () => theseWillGo(instances(schema[kind]),values[kind]));
+        describe(`generate instances as ${example.description}`, 
+            () => theseWillGo(instances(example.schema),example.values));
 
-        describe(`generate non instances as ${kind}`, 
-            () => checkWith(nonInstances(schema[kind]),(v) => ! values[kind].includes(v) ));
+        describe(`generate non instances as ${example.description}`, 
+            () => checkWith(nonInstances(example.schema),(v) => ! example.values.includes(v) ));
 
-        instancesValidate(schema[kind]);
+        instancesValidate(example.schema);
 
-        nonInstancesInvalidate(schema[kind]);
+        nonInstancesInvalidate(example.schema);
     }
 
     
@@ -363,9 +365,9 @@ describe('Objects', function() {
 
 describe('Invalid schemata', function() {
 
-    describe('Invalid schema', () => {
+    describe('Invalid schema raise exception', () => {
         for(const wrong in [1,"","wrong",[],[{"type":"string"}]]) 
-            it(`wong schema ${JSON.stringify(wrong)}`, (done) => {
+            it(`invalid schema ${JSON.stringify(wrong)}`, (done) => {
                assert.throws( () => instances(wrong).next(),{ 
                    name: "Error", 
                    message: /Invalid JSON Schema/ });
@@ -439,36 +441,116 @@ describe('Definitions', function() {
 
 
 describe('Any of', function() {
+    const examples = [
+        {
+            description: 'Either booleans or numbers',
+            schema: {
+                "anyOf": [
+                    { "type": "boolean" },
+                    { "type": "number" }
+                ]
+            },
+            check: (value) => typeof(value) === "boolean" || typeof(value) === "number"
+        },
+        {
+            description: 'Arrays or null',
+            schema: {
+                "anyOf": [
+                    { "type": "array" },
+                    { "type": "null" }
+                ]
+            },
+            check: (value) => { 
+                const type = jsonTypeOf(value); 
+                return type === "array" || type === "null";
+            }
+        },
+        {
+            description: 'booleans also as text',
+            schema: {
+                "anyOf": [
+                    { "type": "boolean" },
+                    { "enum": [ "true", "false"] }
+                ]
+            },
+            check: (value) => 
+                jsonTypeOf(value) === "boolean" || value === "true" || value === "false"
+        }
 
-    describe('Either booleans or numbers', () => checkWith(instances({
-            "anyOf": [
-                { "type": "boolean" },
-                { "type": "number" }
-            ]
-        }),(value) => typeof(value) === "boolean" || typeof(value) === "number"));
+    ];
+
+    for(const example of examples) {
+        describe(example.description, 
+            () => checkWith( instances(example.schema) , example.check ) );
+
+        instancesValidate(example.schema);
+
+        nonInstancesInvalidate(example.schema);
+    }
 });
 
-describe('All of', function() {
 
-    describe('both multiples of 3 and 5', () => checkWith(instances({
-            "allOf": [
-                { "type": "number", "multiple": 3 },
-                { "type": "number", "multiple": 5 }
-            ]
-        }),(value) => value % 3 == 0  && value % 5 == 0 ));
+describe('All of', function() {
+    const examples = [
+        {
+            description: 'both multiples of 3 and 5',
+            schema: {
+                "allOf": [
+                    { "type": "number", "multiple": 3 },
+                    { "type": "number", "multiple": 5 }
+                ]
+            },
+            check: (value) => value % 3 == 0  && value % 5 == 0 
+        }
+    ]
+
+    for(const example of examples) {
+        describe(example.description, 
+            () => checkWith(instances(example.schema), example.check));
+    
+        instancesValidate(example.schema);
+
+        nonInstancesInvalidate(example.schema);
+    }
 });
 
 
 describe('One of', function() {
+    const examples = [
+        {
+            description: 'either multiples of 3 or multiples of 5',
+            schema: {
+                "oneOf": [
+                    { "type": "number", "multiple": 3 },
+                    { "type": "number", "multiple": 5 }
+                ]
+            },
+            check: (value) => 
+                (value % 3 == 0  && value % 5 != 0) || 
+                (value % 3 != 0  && value % 5 == 0)
+        },
+        {
+            description: 'booleans also as text',
+            schema: {
+                "oneOf": [
+                    { "type": "boolean" },
+                    { "enum": [ "true", "false"] }
+                ]
+            },
+            check: (value) => 
+                jsonTypeOf(value) === "boolean" || value === "true" || value === "false"
+        }
+    ];
 
-    describe('either multiples of 3 or nultiples of 5', () => checkWith(instances({
-            "oneOf": [
-                { "type": "number", "multiple": 3 },
-                { "type": "number", "multiple": 5 }
-            ]
-        }),(value) => 
-            (value % 3 == 0  && value % 5 != 0) || 
-            (value % 3 != 0  && value % 5 == 0) ));
+    for(const example of examples) {
+        describe(example.description, 
+            () => checkWith(instances(example.schema), example.check));
+
+        
+        instancesValidate(example.schema);
+
+        nonInstancesInvalidate(example.schema);
+    }
 });
 
  
@@ -476,7 +558,7 @@ describe('Not', function() {
 
     for(const type of [ "boolean", "string", "number", "array", "object"]) {
         const schema = { "not": { "type": type } };
-        
+
         describe(`Not ${type}`, 
             () => checkWith(instances(schema),(value) => jsonTypeOf(value) !== type ));
 

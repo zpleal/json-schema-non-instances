@@ -447,8 +447,8 @@ class JSONGenerator {
                 yield more + 2
 
         } else {
-            const start = schema.minimumExclusive + 1 || schema.minimum || DEFAULT_MINIMUM
-            const stop = schema.maximumExclusive - 1 || schema.maximum || DEFAULT_MAXIMUM;
+            const start = schema.minimumExclusive + 1 || schema.minimum || 0;
+            const stop = schema.maximumExclusive - 1 || schema.maximum || Number.MAX_SAFE_INTEGER;
             const step = schema.multiple || 1;
 
             while (true)
@@ -739,13 +739,25 @@ class JSONGenerator {
         }
     }
 
-    *objectGeneratorWrongStruncture(schema) { 
-
-
-    }
+    *objectGeneratorWrongStruncture(schema) { }
 
     *objectGeneratorWrongContent(schema) { }
 
+    /**
+     * Validate schema with anyOf property
+     * 
+     * @param {*} jsonSchema with anyOf 
+     * @param {*} value 
+     * @returns 
+     */
+    anyOfValidator(jsonSchema,value) {
+
+        for(const schema of jsonSchema.anyOf)
+            if(this.jsonValidator(schema,value))
+                return true;
+
+        return false;
+    }
 
     /**
      * Generate a value that is valid in any of the given schemata
@@ -756,22 +768,46 @@ class JSONGenerator {
     *anyOfGenerator(jsonSchema, non) {
         const collection = jsonSchema.anyOf;
 
-        if(Array.isArray(collection)) {
-            const iterators = [];
+        if (Array.isArray(collection)) {
+            if (non) {
 
-            for(const schema of collection)
-                iterators.push( this.jsonGenerator(schema,non) );
-            // combine ??
-            while (true)
-                for(const iterator of iterators)
-                    yield iterator.next().value;
+                const allOf = collection.map( (s) => { return { not: s }; } );
+                yield*  this.allOfGenerator({ allOf });
 
+            } else {
+           
+                const iterators = [];
+
+                for (const schema of collection)
+                    iterators.push(this.jsonGenerator(schema, non));
+                // combine ??
+                while (true)
+                    for (const iterator of iterators)
+                        yield iterator.next().value;
+            }
         } else
             throw new Error(`Expected array in anyOf and not ${JSON.stringify(collection)}`);
     }
 
     /**
-     * Generate a value that is valid in just one of given schemata
+     * Validates against a oneOf schema
+     * 
+     * @param {*} jsonSchema 
+     * @param {*} value 
+     * @returns 
+     */
+    oneOfValidator(jsonSchema,value) {
+        let count = 0;
+
+        for(const schema of jsonSchema.oneOf)
+            if(this.jsonValidator(schema,value))
+                count++
+
+        return count == 1;
+    }
+
+    /**
+     * Generate a value that is valid in just one of the given schemata
      *
      * @param {*} jsonSchema
      * @param {*} non
@@ -779,30 +815,46 @@ class JSONGenerator {
     *oneOfGenerator(jsonSchema, non) {
         const collection = jsonSchema.oneOf;
 
-        if(Array.isArray(collection)) {
-            const iterators = [];
+        if (Array.isArray(collection)) {
+            
+                const iterators = [];
 
-            for(const schema of collection)
-                iterators.push( this.jsonGenerator(schema,non) );
+                for (const schema of collection)
+                    iterators.push(this.jsonGenerator(schema, non));
 
-            while (true) {
+                while (true) {
 
-                for(const s in collection) {
-                    const value = iterators[s].next().value;
-                    const check = collection
-                        .filter( (_,i) => i != s )
-                        .every(schema => ! this.jsonValidator(schema,value) );
+                    for (const s in collection) {
+                        const value = iterators[s].next().value;
+                        const check = collection
+                            .filter((_, i) => i != s)
+                            .every(schema => !this.jsonValidator(schema, value));
 
-                    if(check)
-                        yield value;
-                };
+                        if (check)
+                            yield value;
+                    };
 
-            }
+                }
 
         } else
             throw new Error(`Expected array in oneOf and not ${JSON.stringify(collection)}`);
     }
 
+    /**
+     * Validates against a allOf schema
+     * 
+     * @param {*} jsonSchema 
+     * @param {*} value 
+     * @returns 
+     */
+    allOfValidator(jsonSchema,value) {
+
+        for(const schema of jsonSchema.allOf)
+            if(! this.jsonValidator(schema,value))
+                return false
+        
+        return true;
+    }
 
     /**
      * Generate a value that is valid in all given schemata
@@ -814,24 +866,32 @@ class JSONGenerator {
         const collection = jsonSchema.allOf;
 
         if(Array.isArray(collection)) {
-            const iterators = [];
 
-            for(const schema of collection)
-                iterators.push( this.jsonGenerator(schema,non) );
+            if(non) {
 
-            while (true) {
+                const anyOf = collection.map( (s) => { return { not: s }; } );
+                yield* this.anyOfGenerator({ anyOf });
 
-                for(const s in collection) {
-                    const value = iterators[s].next().value;
-                    const check = collection
-                        .filter( (_,i) => i != s )
-                        .every(schema => this.jsonValidator(schema,value) );
+            } else {
 
-                    if(check)
-                        yield value;
-                };
+                const iterators = [];
+
+                for(const schema of collection)
+                    iterators.push( this.jsonGenerator(schema,non) );
+
+                while (true) {
+
+                    for(const s in collection) {
+                        const value = iterators[s].next().value;
+                        const check = collection
+                            .filter( (_,i) => i != s )
+                            .every(schema => this.jsonValidator(schema,value) );
+
+                        if(check)
+                            yield value;
+                    };
+                }
             }
-
         } else
             throw new Error(`Expected array in allOf and not ${JSON.stringify(collection)}`);
     }
