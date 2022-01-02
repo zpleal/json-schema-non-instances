@@ -297,6 +297,119 @@ describe('Arrays', function() {
      describe('non arrays', () => nothingWithType(nonInstances({ "type": "array" }),"array") );
 });
 
+describe('Tuples (arrays with itemPrefixes)', () => {
+    const examples = [
+        {
+            description: 'Simple tuple',
+            schema: {
+                type: "array",
+                prefixItems: [ 
+                    { type: "boolean" },
+                    { type: "number" }
+                ],
+            },
+            values:   [ [ true, 1 ], [ false, 0 ], [ true, 1.1], [ false, -22 ],
+                        [ true ], [ false ], [] // incomplete tuples
+            ],
+            nonValues: [ [ 1, true ], [ true, true ], [ 0, 0 ], [ false, false ] ]
+        },
+        {
+            description: 'Simple tuple with extra items',
+            schema: {
+                type: "array",
+                prefixItems: [ 
+                    { type: "boolean" },
+                    { type: "number" }
+                ],
+                items: { type: "string"}
+            },
+            values:  [ [ true, 1, "a" ], [ false, 0, "" ], [ true, 1.1, "hello"], [ false, -22 ]],
+            nonValues: [ [ true, 1, 0 ], [ true, 1, false ], [ false, 0, null ] ]
+        },
+        {
+            description: 'Simple but strict tuple (prefixItemsStrict extension)',
+            schema: {
+                type: "array",
+                prefixItems: [ 
+                    { type: "boolean" },
+                    { type: "number" }
+                ],
+                prefixItemsStrict: true
+            },
+            values:   [ [ true, 1 ], [ false, 0 ], [ true, 1.1], [ false, -22 ] ],
+            nonValues: [ [ true ], [ false ], [],    // incomplete tuples 
+                [ 1, true ], [ true, true ], [ 0, 0 ], [ false, false ] ]
+        },
+        {
+            description: 'Tuple with optional item type',
+            schema: {
+                type: "array",
+                prefixItems: [ 
+                    { type: "boolean", minOccurs: 0},
+                    { type: "number" }
+                ],
+            },
+            values:   [ [ true, 1 ], [ 1 ], [ true, 0 ], [ false, -22 ], [ true, 1, true ] ],
+            nonValues: [ [ "" ], [ true, true ], [ "", 1 ], [ "", 0 ] ]
+        },
+        {
+            description: 'Tuple with optional item type (strict)',
+            schema: {
+                type: "array",
+                prefixItems: [ 
+                    { type: "boolean", minOccurs: 0},
+                    { type: "number" }
+                ],
+                prefixItemsStrict: true
+            },
+            values:   [ [ true, 1 ], [ 1 ], [ true, 0 ], [ false, -22 ] ],
+            nonValues: [ [ "" ], [ true, 1, true ], [ true, 1, false ],[ "", 1 ], [ "", 0 ] ]
+        },
+        {
+            description: 'Tuple with zero or more repetions of item type (strict)',
+            schema: {
+                type: "array",
+                prefixItems: [ 
+                    { type: "boolean", minOccurs: 0, maxOccurs: "unbounded" },
+                    { type: "number" }
+                ],
+                prefixItemsStrict: true
+            },
+            values:   [ [ 1 ], [ true, 1 ], [ false, true, 0 ], [ false, true, true, 1 ] ],
+            nonValues: [ [ 1, 1 ], [ 1, "" ], [ "" ], [ true, false, 1, 1 ] ]
+        },
+        {
+            description: 'Tuple with one or more repetions of item type (strict)',
+            schema: {
+                type: "array",
+                prefixItems: [ 
+                    { type: "boolean", minOccurs: 1, maxOccurs: "unbounded" },
+                    { type: "number" }
+                ],
+                prefixItemsStrict: true
+            },
+            values:   [  [ true, 1 ], [ false, true, 0 ], [ false, true, true, 1 ] ],
+            nonValues: [ [ 1 ], [ 1, 1 ], [ 1, "" ], [ "" ], [ true, false, 1, 1 ] ]
+        },
+    ]
+
+    for(const example of examples)
+        describe(example.description,() => {
+    
+            for(const value of example.values) 
+                it(`check validate ${JSON.stringify(value)}`, (done) => {
+                    assert( validate(example.schema,value) );
+                    done();
+                });
+
+            for(const nonValue of example.nonValues) 
+                it(`check invalidate ${JSON.stringify(nonValue)}`, (done) => {
+                    assert( ! validate(example.schema,nonValue) );
+                done();
+            });        
+        });
+
+});
 
 describe('Objects', function() {
     const examples = [

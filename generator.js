@@ -102,6 +102,16 @@ class JSONGenerator {
     }
 
     /**
+     * Validate a refered schema
+     * 
+     * @param {*} jsonSchema 
+     * @param {*} value 
+     */
+    $refValidator(jsonSchema,value) {
+        return this.jsonValidator(this.getDefinition(jsonSchema.$ref),value);
+    }
+
+    /**
      * Generate (non)-instances for given JSON Schema
      * @param {*} jsonSchema
      * @param {*} non
@@ -529,21 +539,87 @@ class JSONGenerator {
      * @returns true if valida; false otherwise
      */
     arrayValidator(jsonSchema,value) {
+    
         if(JSONGenerator.jsonTypeOf(value) != "array")
             return false;
 
-        if(jsonSchema.minItems && value.length < jsonSchema.minItems)
+        const length = value.length;
+        
+
+        if(jsonSchema.minItems && length < jsonSchema.minItems)
             return false;
 
-        if(jsonSchema.maxItems && value.length > jsonSchema.maxItems)
+        if(jsonSchema.maxItems && length > jsonSchema.maxItems)
             return false;
+
+        let currentItem = 0;
+
+        if(jsonSchema.prefixItems) {
+            currentItem = this.arrayValidatorPrefixes(jsonSchema,value);
+            if(currentItem < 0)
+                return false;
+        }
 
         if(jsonSchema.items)
-            for(const item of value)
+            while(currentItem < length) {
+                const item = value[currentItem++];
+                
                 if(! this.jsonValidator(jsonSchema.items,item))
                     return false;
+            }
         return true;
 
+    }
+
+    /**
+     * Validates array values as (generalizations of) tuples.
+     * Tuples are arrays with the prefixItems property, containing an array of schemas
+     * Schemas in prefixItems may have minOccurs and maxOccurs properties 
+     * with non-integer values; maxOccurs may have "unbounded as value".
+     * If prefixItemsStrict is true then all prefixItems must be used.
+     * 
+     * @param {*} jsonSchema of type array with prefixItems property 
+     * @param {*} value  ti be validates
+     * @returns number of validated items, or -1 if invalid
+     */
+    arrayValidatorPrefixes(jsonSchema,value) {
+        const length = value.length;
+        const prefixes = jsonSchema.prefixItems;
+        let currentItem = 0;
+        let currentPrefix = 0;
+        let prefix, countOccurs, minOccurs, maxOccurs;
+
+        while (currentItem < length && currentPrefix < prefixes.length) {
+            const item = value[currentItem];
+            if (!prefix) {
+                prefix = prefixes?.[currentPrefix];
+                minOccurs = prefix?.minOccurs ?? 1;
+                maxOccurs = prefix?.maxOccurs ?? 1
+                countOccurs = 0;
+
+                maxOccurs = maxOccurs === "unbounded" ? Number.MAX_SAFE_INTEGER : maxOccurs;
+            }
+
+            if (countOccurs >= maxOccurs) {
+                prefix = null;
+                currentPrefix++;
+            } else if (this.jsonValidator(prefix, item)) {
+                currentItem++;
+                countOccurs++;
+            } else {
+                if (countOccurs < minOccurs)
+                    return -1;
+                else {
+                    prefix = null;
+                    currentPrefix++;
+                }
+            }
+        }
+
+        if(jsonSchema.prefixItemsStrict && currentPrefix + 1 != prefixes.length)
+            return -1;
+        else
+            return currentItem;
     }
 
     /**
