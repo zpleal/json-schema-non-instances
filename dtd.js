@@ -68,14 +68,14 @@
  * 
  */
 
-const { type } = require('mocha/lib/utils');
-const jsonGenerator  = require('../generator.js');
-const { serialize } = require('./xmlinjson.js');
+const jsonGenerator  = require('./generator.js');
+const xml  = require('./xmlinjson.js');
 
 class DTDgenerator {
 
     constructor(dtdSchema) {
         this.dtdSchema = dtdSchema;
+        this.parseDtd();
     }
 
     /**
@@ -85,7 +85,7 @@ class DTDgenerator {
         const jsonSchema = this.getJsonSchema();
 
         for(const json of jsonGenerator.instances( jsonSchema ) ) 
-            yield serialize(json);
+            yield xml.serialize(json);
     }
 
     /**
@@ -95,85 +95,122 @@ class DTDgenerator {
         const jsonSchema = this.getJsonSchema();
 
         for(const json of jsonGenerator.instances( jsonSchema ) ) 
-            yield serialize(json);
+            yield xml.serialize(json);
     }
 
     /**
-     * Non instances of this DTD
-     * 
+     * Convert this DTD to a JSON Schem defintion
      */
     getJsonSchema() {
-        const { root, defs } = DTDgenerator.parseDocType(this.dtdSchema)
-        const jsonSchema = {};
+        const jsonSchema = { 
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            // "$id": "https://www.dcc.fc.up.pt/product.schema.json",
 
-        if(root) 
-            jsonSchema.$ref = root;
+            "title": "JSON from DTD",
+            "description": "JSON Schema generated from a DTD",
+            "definitions": this.definitions 
+        } 
+
+        if(this.root) 
+            jsonSchema.$ref = this.root;
+
+        return jsonSchema;
+    }
+
+    parseDtd() {
 
         // TODO process parametric entities
 
-        jsonSchema.definition = DTDgenerator.parseElements(defs);
-    }
-
-    static parseDocType(dtdSchema) {
-        const found = dtdSchema.match(/<!DOCTYPE (\w+) [(\.*)]>/)
+        const found = this.dtdSchema.match(
+            /<!DOCTYPE\s+(\w+)\s+(?:SYSTEM\s+(\w*)|PUBLIC\s(\w*)\s(\w*))?\s*(\[.*\])?>/ms);
     
         if(found) { 
-            const [ root, defs] = found;
-            return { root, defs };
+            const [ _ , root, systemUrl, identifier, publicUrl, definitions ] = found;
+
+            this.root     = root;
+
+            if(systemUrl) 
+                throw new Error("SYSTEM URLs not implemented yet");
+            if(publicUrl) 
+                throw new Error("PUBLIC URLs not implemented yet");
+
+            this.parseTypes(definitions);
         } else
-            return { defs: dtdSchema};
+            this.parseTypes(this.dtdSchema);
     }
 
-    static parseElements(defs) {
+    /**
+     * Parse DTD <!ELEMENT> and <!ATTLIST> and return JSON Schema defintions
+     *  
+     * @param {*} defs 
+     */
+    parseTypes(defs) {
         const elMatch = [ ...defs.matchAll(/<!ELEMENT\s+(\w+)\s+([^>]*)>/g) ];
-        const atMatch = [ ...defs.matchAll(/<!ATTLIST\s+(\w+)\s+([^>]*)>/g/g) ];
-        const definitions = {};
+        const atMatch = [ ...defs.matchAll(/<!ATTLIST\s+(\w+)\s+([^>]*)>/g) ];
+        
+        this.definitions = {};
 
-        elMatch.forEach( (match => {
-            const [ name, model ] = match;
-            definitions[name] = {
-                "$id": name,
-                "type": "object",
-                "properties": {
-                    "name": { "const":  name },
-                    "attributes": {
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    },
-                    "content": DTDgenerator.parseModel(model)                    
-                } 
-            }
-        }));
+        elMatch.forEach( (ele => this.processElement(ele)));
 
-        atMatch.forEach( (def => {
-            const [ element, attlistdef ] = def;
-            const attlist = attlistdef.split(/\s+/);
-            const attributes = definitions[element].properties.attributes; 
+        atMatch.forEach( (att => this.processAttributes(att)));
 
-            for( [ attribute, type, ommit ] of attlist) {
-                const schema = DTDgenerator.parseAttributeType(type);
-                
-                switch(ommit) {
-                    case "#REQUIRED":
-                        attributes.required.push(attribute);
-                        break;
-                    case "#IMPLIED":
-                        // No default provided, not reqquired
-                        break;
-                    default:
-                        // JSON Schema validators do nothing with this 
-                        schema.default = ommit;
-                }
-                attributes.properties[attribute] = schema;
-                    
-            }
-            }));
     }
 
-    static parseAttributeType(type) {
+    /**
+     * Process element name and model and add it to the definitions field
+     * 
+     * @param [name, model] element data  
+     */
+    processElement([ , name, model ]) {
+
+        this.definitions[name] = {
+            "$id": name,
+            "title": `Type for ${name}`,
+            "description": `Generated from model: ${model}`,
+            "type": "object",
+            "properties": {
+                "element": { "const":  name },
+                "attributes": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                },
+                "content": this.parseModel(model),                    
+            },
+            "required": [ "element" ]
+        }
+    }
+
+
+    processAttributes([ , element, attlistdef ]) {
+        const attlist = attlistdef.split(/\s+/);
+        const definition = this.definitions[element];
+        const attributes = definition.properties.attributes; 
+
+        if(attlist.length > 0)
+            definition.required.push("attributes");
+
+        for( const [ attribute, type, ommit ] of attlist) {
+            const schema = this.parseAttributeType(type);
+            
+            switch(ommit) {
+                case "#REQUIRED":
+                    attributes.required.push(attribute);
+                    break;
+                case "#IMPLIED":
+                    // No default provided, not reqquired
+                    break;
+                default:
+                    // JSON Schema validators do nothing with this 
+                    schema.default = ommit;
+            }
+            attributes.properties[attribute] = schema;
+        }
+    }
+
+    parseAttributeType(type) {
         const jsonType = {};
-        const enumeration = DTDgenerator.getEnumeration(type);
+        const enumeration = this.getEnumeration(type);
 
         if(enumeration)
             jsonType.enum = enumeration;
@@ -208,7 +245,7 @@ class DTDgenerator {
      * @param {*} type of attribute
      * @returns enumeration
      */
-    static getEnumeration(type) {
+    getEnumeration(type) {
         const found = type.match(/\((.*)\)/);
 
         if(found) 
@@ -217,34 +254,190 @@ class DTDgenerator {
             return;
     }   
 
-    static parseModel(model) {
-        const jsonType = { "type": "array" };
+    /**
+     * Parse a model, as either
+     *  - basic
+     *  - mixed content
+     *  - expression
+     * 
+     * The type for content is always an array
+     * and the type for its items depends on the model
+     * 
+     * @param {string} model 
+     * @returns type content
+     */
+    parseModel(model) {
+        const schema = { 
+            "type": "array",
+            "title": "Type for element model",
+            "description": `generated from ${model}`
+        };
+        
+        schema.items =
+                this.parseBasic(model,schema)    ||
+                this.parseMixedContent(model)    || 
+                this.parseExpression(model);
 
+        if(!schema.items)
+            throw new Error(`Invalid model: ${model}`);
+
+        return schema;
+    }
+
+    /**
+     * Parse given model as basic and return a type for items
+     * The schema itself is passed, to add other properties, if needed
+     * @param {string} model 
+     * @param {*} schema where the items are integrated 
+     * @returns type for items or null
+     */
+    parseBasic(model,schema) {
         switch(model) {
             case 'EMPTY':
-                jsonType.items = "false";
-                jsonType.maxContains = 0;
-                break;
+                schema.maxContains = 0;
+                return "false";
             case 'ANY':
-                jsonType.items = "true";
-                break;
+                return "true";
             case '(#PCDATA)':
-                jsonType.items = { "type": "string" }+;
-                jsonType.maxContains = 1;
-                break;
+                schema.maxContains = 1;
+                return { "type": "string" };
             case '(#RCDATA)':
                 throw new Error("Avoid using raw character data");
             default:
-                const found = model.match(/\(\s*(#PCDATA(?:\s*\|\s*\w+)+)\s*\)\*/gm);
-                if(found) {
-                    const types = found[1]
-                        .split(/\s*\|\s*/)
-                        .map( (t) => t === "#PCDATA" ? { "type": "string" } : { "$ref": t } );
-                    json.items = { "anyOf": types};
-                } else
-                    json.items = parseExpression(model);
+                return null;
         }
+    }
 
-        return jsonType;
+    /**
+     * Parses given model as mixed content
+     * 
+     * @param {string} model 
+     * @returns type for items or null
+     */
+    parseMixedContent(model) {
+        const found = model.match(/\(\s*(#PCDATA(?:\s*\|\s*\w+)+)\s*\)\*/m);
+        
+        if(found) {
+            const types = found[1]
+                .split(/\s*\|\s*/)
+                .map( (t) => t === "#PCDATA" ? { "type": "string" } : { "$ref": t } );
+         
+            return { "anyOf": types};
+        } else  
+            return null;
+    }
+
+    /**
+     * Parse model as expression
+     * 
+     * @param {string} expression 
+     * @returns schema
+     */
+    parseExpression(expression) {
+        const schema = this.parseParentesis(expression) || this.parseSingle(expression);
+
+        if(schema)
+            return schema;
+        else
+            throw new Error(`invalid expression: ${expression}`);
+    }
+
+    /**
+     * Parses an expression with parentesis
+     * @param {string} expression with, or withoyt, parentesis
+     * @returns schema for given expression or null
+     */
+    parseParentesis(expression) {
+        const found = expression.match(/\((.*)\)([\+\*\?]?)/m);
+
+        if(found) {
+            const [ body, repetitionOperator ] = found;
+            return this.parseGroup(body,repetitionOperator);
+        } else
+            return null;
+    }
+
+    /**
+     * Parses a single expression (without parentesis).
+     * @param {string} expression 
+     * @returns schema for given expression or null 
+     */
+    parseSingle(expression) {
+        const found = expression.match(/(.*)([\+\*\?]?)/m);
+
+        if(found) {
+            const [ , body, repetitionOperator ] = found;
+            
+            return this.makeExpressionSchema('$ref', body, repetitionOperator);
+        } else
+            return null;
+    }
+
+    /**
+     * Parses a group with ',' or '|'
+     * @param {string} expression that might have ',' or '|' 
+     * @param {string} repetitionOperator 
+     * @returns a squema for this expression or null
+     */
+    parseGroup(expression,repetitionOperator) {
+        const found = expression.match(/[\,\|]/);
+
+        if(found) {
+            const operator = found[0];
+            const parts    = expression.split(new RegExp(`\s*${operator}\s*`));
+            const type     = ',' ? 'sequence' : 'anyOf' ;
+            const items    = parts.map( e => this.parseExpression(e) );
+
+            return this.makeExpressionSchema(type, items, repetitionOperator);
+        } else 
+            null;
+    }
+
+    /**
+     * Make a schema with  with given items and repetition
+     * @param {*} kind   { 'sequence', 'oneOf' or '$ref' }
+     * @param {*} value 
+     * @param {*} repetitionOperator { '+', '*', '?' } 
+     * @returns schema
+     */
+    makeExpressionSchema(kind,value,repetitionOperator) {
+        const minOccurs = repetitionOperator == '+' ? 1 : 0 ;
+        const maxOccurs = repetitionOperator == '?' ? 1 : "unbounded" ;
+        const group = { minOccurs, maxOccurs };
+
+        group[kind] = value;
+
+        return group;
     }
 }
+
+module.exports = {
+
+    getJsonSchema: function(dtd) {
+        const generator = new DTDgenerator(dtd);
+
+        return generator.getJsonSchema();
+    },
+
+    validate: function(dtd,xmlDoc) {
+        const jsonDoc    = xml.parse(xmlDoc)
+        const generator  = new DTDgenerator(dtd);
+        const jsonSchema = generator.getJsonSchema();
+                        
+        return jsonGenerator.validate(jsonSchema,jsonDoc);
+    },
+
+    instances: function*(dtd) {
+        const generator = new DTDgenerator(dtd);
+
+        yield* generator.instances();
+    },
+
+    nonInstances: function*(dtd) {
+        const generator = new DTDgenerator(dtd);
+
+        yield* generator.nonInstances();
+    }
+
+}
+
