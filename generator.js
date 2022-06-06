@@ -42,7 +42,7 @@ const DEFAULT_MAXIMUM = 5;
 
 const BASIC_SCHEMATA = [ "type", "enum", "const", "$ref", "allOf", "oneOf", "anyOf", "not" ]
 
-const JSON_TYPES = ["null", "boolean", "number", "string", "array", "object"];
+const BASIC_TYPES = ["null", "boolean", "number", "integer", "string", "array", "object"];
 
 class JSONGenerator {
 
@@ -278,7 +278,7 @@ class JSONGenerator {
      * @returns true if valid; false otherwise
      */
     typeValidator(jsonSchema,value) {
-        if (JSON_TYPES.includes(jsonSchema.type)) {
+        if (BASIC_TYPES.includes(jsonSchema.type)) {
             const validator = this[jsonSchema.type + "Validator"].bind(this);
 
             return validator(jsonSchema,value);
@@ -294,12 +294,14 @@ class JSONGenerator {
      * @param {*} non true to generate non instances; false otherwise
      */
     *typeGenerator(jsonSchema, non) {
-        if (JSON_TYPES.includes(jsonSchema.type)) {
+        if (BASIC_TYPES.includes(jsonSchema.type)) {
             const generator = this[jsonSchema.type + "Generator"].bind(this);
 
             if (non) {
-                const other = JSON_TYPES
-                    .filter((n) => n !== jsonSchema.type)
+                const other = BASIC_TYPES
+                    // integer is a special case of number, 
+                    // not really a different basic type 
+                    .filter((n) => n != "integer" && n !== jsonSchema.type)
                     .map(n => this[n + "Generator"].call(this));
 
                 if (generator)
@@ -347,7 +349,7 @@ class JSONGenerator {
             // no JSON object
         } else
             yield* this.combine(
-                JSON_TYPES.map(n => this[n + "Generator"].bind(this)()));
+                BASIC_TYPES.map(n => this[n + "Generator"].bind(this)()));
     }
 
     /**
@@ -402,6 +404,17 @@ class JSONGenerator {
     }
 
     /**
+     * Validates numeric values, a particular case of numeric valus
+     *
+     * @param {*} jsonSchema with number type
+     * @param {*} value to validate
+     * @returns true if valid; false otherwise
+     */
+    integerValidator(jsonSchema,value) {
+        return Number.isInteger(value) && this.numberValidator(jsonSchema,value);
+    }
+
+    /**
      * Validates numeric values
      *
      * @param {*} jsonSchema with number type
@@ -437,12 +450,23 @@ class JSONGenerator {
     }
 
     /**
-     * Generates (non) instance numbers of given JSON Schema
+     * Generates (non) instance number of given JSON Schema.
+     * Currently only intgeger are generated
      *
      * @param {*} jsonSchema a JSON Schema object
      * @param {*} non if true generates a non-instance
      */
     *numberGenerator(jsonSchema, non) {
+        yield* this.integerGenerator(jsonSchema, non);
+    }
+
+    /**
+     * Generates (non) instance integer of given JSON Schema
+     *
+     * @param {*} jsonSchema a JSON Schema object
+     * @param {*} non if true generates a non-instance
+     */
+    *integerGenerator(jsonSchema, non) {
         const schema = {
             ...jsonSchema
         };
@@ -560,7 +584,7 @@ class JSONGenerator {
                 return false;
         }
 
-        if(jsonSchema.items)
+        if(jsonSchema.items != undefined) // items may false (no items allowed)
             while(currentItem < length) {
                 const item = value[currentItem++];
                 
@@ -738,10 +762,10 @@ class JSONGenerator {
 
         const properties = Object.keys(value);
 
-        if(jsonSchema.minProperties && properties.length < jsonSchema.minProperties)
+        if(jsonSchema.minProperties != undefined && properties.length < jsonSchema.minProperties)
             return false;
 
-        if(jsonSchema.maxProperties && properties.length > jsonSchema.maxProperties)
+        if(jsonSchema.maxProperties != undefined && properties.length > jsonSchema.maxProperties)
             return false;
 
         if(jsonSchema.required)
