@@ -1,6 +1,4 @@
 const assert = require('assert');
-const { kStringMaxLength } = require('buffer');
-const { get } = require('http');
 const { getJsonSchema, validate, instances, nonInstances } = require('../dtd');
 
 
