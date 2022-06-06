@@ -173,7 +173,8 @@ class DTDgenerator {
                 "attributes": {
                     "type": "object",
                     "properties": {},
-                    "required": []
+                    "required": [],
+                    "maxProperties": 0
                 },
                 "content": this.parseModel(model),                    
             },
@@ -205,6 +206,7 @@ class DTDgenerator {
                     schema.default = ommit;
             }
             attributes.properties[attribute] = schema;
+            attributes.maxProperties++;
         }
     }
 
@@ -274,11 +276,11 @@ class DTDgenerator {
         };
         
         schema.items =
-                this.parseBasic(model,schema)    ||
-                this.parseMixedContent(model)    || 
+                this.parseBasic(model,schema)    ??
+                this.parseMixedContent(model)    ?? 
                 this.parseExpression(model);
 
-        if(!schema.items)
+        if(schema.items == null) // may be false
             throw new Error(`Invalid model: ${model}`);
 
         return schema;
@@ -287,17 +289,17 @@ class DTDgenerator {
     /**
      * Parse given model as basic and return a type for items
      * The schema itself is passed, to add other properties, if needed
-     * @param {string} model 
-     * @param {*} schema where the items are integrated 
-     * @returns type for items or null
+     * @param {string} model to parse
+     * @param {*} schema where the items are integrated (extra attributes)
+     * @returns type for items or null if not basic 
      */
     parseBasic(model,schema) {
         switch(model) {
             case 'EMPTY':
                 schema.maxContains = 0;
-                return "false";
+                return false;
             case 'ANY':
-                return "true";
+                return true;
             case '(#PCDATA)':
                 schema.maxContains = 1;
                 return { "type": "string" };
@@ -311,8 +313,8 @@ class DTDgenerator {
     /**
      * Parses given model as mixed content
      * 
-     * @param {string} model 
-     * @returns type for items or null
+     * @param {string} model to parse 
+     * @returns type for items or null if not mixed content
      */
     parseMixedContent(model) {
         const found = model.match(/\(\s*(#PCDATA(?:\s*\|\s*\w+)+)\s*\)\*/m);
@@ -330,16 +332,11 @@ class DTDgenerator {
     /**
      * Parse model as expression
      * 
-     * @param {string} expression 
-     * @returns schema
+     * @param {string} expression to parse
+     * @returns schema of null if not an expression
      */
     parseExpression(expression) {
-        const schema = this.parseParentesis(expression) || this.parseSingle(expression);
-
-        if(schema)
-            return schema;
-        else
-            throw new Error(`invalid expression: ${expression}`);
+        return this.parseParentesis(expression) ?? this.parseSingle(expression);
     }
 
     /**
@@ -359,8 +356,8 @@ class DTDgenerator {
 
     /**
      * Parses a single expression (without parentesis).
-     * @param {string} expression 
-     * @returns schema for given expression or null 
+     * @param {string} expression ro parse
+     * @returns schema for given expression or null if not a sigle expression
      */
     parseSingle(expression) {
         const found = expression.match(/(.*)([\+\*\?]?)/m);
