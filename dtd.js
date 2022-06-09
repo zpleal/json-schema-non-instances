@@ -191,8 +191,14 @@ class DTDgenerator {
         if(attlist.length > 0)
             definition.required.push("attributes");
 
-        for( const [ attribute, type, ommit ] of attlist) {
-            const schema = this.parseAttributeType(type);
+        if( attlist.length % 3 != 0)
+            throw new Error("Invalid # of parts in ATTLIST definition");
+
+        while(attlist.length > 0) {
+            const attribute  = attlist.shift();
+            const type      = attlist.shift();
+            const ommit     = attlist.shift();
+            const schema    = this.parseAttributeType(type);
             
             switch(ommit) {
                 case "#REQUIRED":
@@ -348,7 +354,7 @@ class DTDgenerator {
         const found = expression.match(/\((.*)\)([\+\*\?]?)/m);
 
         if(found) {
-            const [ body, repetitionOperator ] = found;
+            const [ _, body, repetitionOperator ] = found;
             return this.parseGroup(body,repetitionOperator);
         } else
             return null;
@@ -381,7 +387,8 @@ class DTDgenerator {
 
         if(found) {
             const operator = found[0];
-            const parts    = expression.split(new RegExp(`\s*${operator}\s*`));
+            const regExpStr= `\\s*\\${operator}\\s*`;
+            const parts    = expression.split(new RegExp(regExpStr));
             const type     = ',' ? 'sequence' : 'anyOf' ;
             const items    = parts.map( e => this.parseExpression(e) );
 
@@ -398,8 +405,8 @@ class DTDgenerator {
      * @returns schema
      */
     makeExpressionSchema(kind,value,repetitionOperator) {
-        const minOccurs = repetitionOperator == '+' ? 1 : 0 ;
-        const maxOccurs = repetitionOperator == '?' ? 1 : "unbounded" ;
+        const minOccurs = (repetitionOperator == '' || repetitionOperator == '+') ? 1 : 0 ;
+        const maxOccurs = (repetitionOperator == '' || repetitionOperator == '?') ? 1 : "unbounded" ;
         const group = { minOccurs, maxOccurs };
 
         group[kind] = value;
