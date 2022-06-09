@@ -4,7 +4,7 @@ const { getJsonSchema, validate, instances, nonInstances } = require('../dtd');
 
 describe('DTD and documents',() => {
 
-    const examples = [
+    const examples = [ /*
         {
             description: 'Simple DTD with just top empty element',
             dtd: `<!DOCTYPE top [
@@ -22,7 +22,93 @@ describe('DTD and documents',() => {
             },
             instances: [ '<top/>' ],
             nonInstances: [ '<root/>', '<top>hello</top>', '<top a="1"/>' ]
-        }
+        }, */ 
+        
+        {
+            description: 'Top element with either #PCDATA or element b iwth atributes x and y',
+            dtd: `<!DOCTYPE top [
+                <!ELEMENT top (#PCDATA)>
+            ]>
+            `,
+            definitions: {
+                'top': {
+                    $id: 'top',
+                    type: 'object',
+                    properties: { element: { const: 'top'} },
+                    content: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        maxItems: 1
+                    }
+                }
+            },
+            instances: [ '<top/>', '<top></top>', '<top>Hello</top>', '<top>Hello world!</top>'  ],
+            nonInstances: [ '<root/>', '<top x="1"/>', '<top x="1"></top>', '<top x="1">Hello</top>']
+        },
+        /* {
+            description: 'Top element with either #PCDATA or element b iwth atributes x and y',
+            dtd: `<!DOCTYPE top [
+                <!ELEMENT top (#PCDATA | b)>
+                <!ELEMENT b (#PCDATA)>
+                <!ATTLIST top x CDATA "" y CDATA ""> 
+                ]>
+            `,
+            expected:  {
+                definitions: {
+                    'top': {
+                        $id: 'top',
+                        type: 'object',
+                        properties: { 
+                            element: { const: 'top'},
+                            attributes: { 
+                                type: 'object',
+                                properties: {
+                                    x: { type: 'string' },
+                                    y: { type: 'string' }
+                                },
+                                required: [],
+                                maxProperties: 2
+                            },
+                            content: {
+                                type: 'array',
+                                items: {
+                                    anyOf: [
+                                        { type: 'string' },
+                                        { $ref: 'b'}
+                                    ] 
+                                }
+                                    
+                            },
+                            maxItems: 1
+                         }
+                    },
+                    'b': {
+                        '$id': 'b', 
+                        type: 'object',
+                        properties: {
+                            element: { const: 'b' },
+                            properties: {},
+                            required: [],
+                            maxProperties: 0
+                        },
+                        content: {
+                            type: 'array',
+                            items: { type: 'string' },
+                            maxItems: 1
+                        }
+                    }
+                },
+                $ref: 'top'
+            },
+            instances: [ '<top/>', '<top></top>', '<top>Hello</top>', '<top>Hello World!</top>', 
+                         '<top><b/></top>', '<top><b></b></top>', '<top><b>Hello</b></top>',
+                         '<top x="1"/>', '<top x="1" y="2"/>', '<top x="1"></top>', '<top x="1" y="2"></top>',
+                         '<top x="1">Hello world!</top>', '<top x="1" y="2">Hello world!</top>',
+                         '<top x="1" y="2"><b/></top>', '<top x="1" y="2"><b></b></top>', '<top x="1" y="2"><b>Hello</b></top>'],
+            nonInstances: [ '<top><a/></top>', '<top><a>Hello</a></top>',
+                            '<top z="1"></top>', '<top x="1" y="3"></top>', '<top z="1">Hello</top>',
+                            '<top>Hello <b>world</b></top>' ]
+        } */
     ];
 
     for(const example of examples)
@@ -48,29 +134,6 @@ describe('DTD and documents',() => {
         });
 });
 
-describe('Simple DTD with just top empty element', () => {
-    const dtd = `<!DOCTYPE top [
-        <!ELEMENT top EMPTY>
-    ]>`;
-    const expected = {
-        definitions: {
-            'top': {
-                $id: 'top',
-                type: 'object',
-                properties: { element: { const: 'top'} }
-            }
-        },
-        $ref: 'top'
-    };
-    const actual = getJsonSchema(dtd);
-
-    it('JSON Schema', (done) => { similarTo(actual,expected); done();});
-
-    it('validate', (done) => { assert(validate(dtd,'<top/>')); done(); });
-
-
-   // console.log(JSON.stringify(obtained,null,'    '));
-});
 /*
 describe('', () => {
     const dtd = `<!DOCTYPE top [
@@ -94,7 +157,7 @@ function similarTo(actual,expected) {
         case "object":
             if(typeof actual !== type)
                 throw new assert.AssertionError({ 
-                    message: `expected object ${expected} but got ${actual}`,
+                    message: `expected object ${JSON.stringify(expected)} but got ${JSON.stringify(actual)}`,
                     actual, expected
                 });
             if(Array.isArray(expected)) {
@@ -111,9 +174,16 @@ function similarTo(actual,expected) {
                     });
             }
                 
-            for(const key in expected)
-                similarTo(actual[key],expected[key]);
-             break;
+            for(const key in expected) {
+                if(actual[key])
+                    similarTo(actual[key],expected[key]);
+                else
+                    throw new assert.AssertionError({
+                        message: `expected key ${key} in ${JSON.stringify(actual)}`,
+                        expected, actual
+                    });
+            }
+            break;
         default:
             if(actual !== expected)
                 throw new assert.AssertionError({
