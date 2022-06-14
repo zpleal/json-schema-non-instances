@@ -476,6 +476,65 @@ describe('Objects', function() {
 
 });
 
+describe('Objects and aditional properties', function() {
+    const examples = [
+        {
+            description: "No aditionalProperties",
+            schema: {
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string"}
+                }
+            },
+            values: [ {}, { a: ""}, { a: "hello"}, { b: "hello"} ],
+            nonValues: [ 1, true, "", "hello", [], [ 1 ]]
+        },
+        {
+            description: "Property aditionalProperties with true",
+            schema: {
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string"}
+                },
+                "aditionalProperties": true
+            },
+            values: [ {}, { a: ""}, { a: "hello"}, { b: "hello"} ],
+            nonValues: []
+        },
+        {
+            description: "Property aditionalProperties with false",
+            schema: {
+                "type": "object",
+                "properties": {
+                    "a": { "type": "string"}
+                },
+                "aditionalProperties": false
+            },
+            values: [ {}, { a: ""}, { a: "hello"} ],
+            nonValues: [ { b: "hello"} ]
+        },
+    ];
+
+    for(const example of examples) {
+        describe(example.description,  () => {
+            
+            for(const value of example.values) 
+                it(`check validate ${JSON.stringify(value)}`, (done) => {
+                    assert( validate(example.schema,value) );
+                    done();
+                });
+
+            for(const nonValue of example.nonValues) 
+                it(`check invalidate ${JSON.stringify(nonValue)}`, (done) => {
+                    assert( ! validate(example.schema,nonValue) );
+                done();
+            });
+
+        });
+    }    
+
+});
+
 describe('Invalid schemata', function() {
 
     describe('Invalid schema raise exception', () => {
