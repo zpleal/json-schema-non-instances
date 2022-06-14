@@ -74,7 +74,7 @@ describe('DTD and documents',() => {
                     }
                 }
             },
-            instances: [ '<top/>', '<top></top>', '<top x="1">', '<top x="1"></top>', '<top x="hello world">'  ],
+            instances: [ '<top/>', '<top></top>', '<top x="1"/>', '<top x="1"></top>', '<top x="hello world"/>'  ],
             nonInstances: [ '<root/>', '<top y="1"/>', '<top x="1">Hello</top>', '<top x="1" y="2"/>', '<top y="2">Hello world!<top/>']
         },
         /*
