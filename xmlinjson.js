@@ -175,15 +175,21 @@ class Parser {
 
     parseContent(name) {
         const content = [];
+        let lastToken;
         let token;
 
         while(token = this.nextToken()) {
+            lastToken = token;
             switch(token.kind) {
                 case 'STRING':
                     content.push(token.text);
                     break;
                 case 'EMPTY':
                     const node = { element: token.name };
+
+                    if(! token.consumedAllAttributes)
+                    this.error(`invalid attributes: ${token.attributesText}`);
+
                     if(token.attributes)
                         node.attributes = token.attributes;
                     content.push(node); 
@@ -191,6 +197,9 @@ class Parser {
                 case 'START':
                     const parsedContent = this.parseContent(token.name);
                     const element = { element: token.name };
+
+                    if(! token.consumedAllAttributes)
+                        this.error(`invalid attributes: ${token.attributesText}`);
 
                     if(token.attributes)
                         element.attributes = token.attributes
@@ -233,6 +242,10 @@ class Parser {
                     this.error(`non implemented token ${token.kind}`);
             }
         }
+        
+        if(name && ! lastToken)
+            this.error(`unexpected end of document`);
+
         return content;
     }
 
@@ -276,12 +289,20 @@ class Parser {
             const name  = found[2];
             const token = { kind, name, text };
             
-            if(found[3]) {
+            token.consumedAllAttributes = true;
+            token.attributesText = found[3] ? found[3].trim() : false;
+
+            if(token.attributesText) {
+                let copy = token.attributesText;
                 token.attributes = {};
 
-                for(const [_all,name,_del,value] of found[3].matchAll(
-                    /\s*([\w:_]*)\s*=\s*(?<d>"|')(.+?)(\k<d>)/gs)) 
-                        token.attributes[name] = value; 
+                for(const [all,name,_del,value] of token.attributesText.matchAll(
+                    /\s*([\w:_]*)\s*=\s*(?<d>"|')(.+?)(\k<d>)/gs)) { 
+                        token.attributes[name] = value;
+                        copy = copy.replace(all,''); 
+                    }
+                
+                token.consumedAllAttributes = copy.trim().length == 0;
             }
             return token;
         } else
