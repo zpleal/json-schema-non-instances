@@ -4,7 +4,7 @@ const { getJsonSchema, validate, instances, nonInstances } = require('../dtd');
 
 describe('DTD and documents',() => {
 
-    const examples = [ /*
+    const examples = [ 
         {
             description: 'Simple DTD with just top empty element',
             dtd: `<!DOCTYPE top [
@@ -22,31 +22,64 @@ describe('DTD and documents',() => {
             },
             instances: [ '<top/>' ],
             nonInstances: [ '<root/>', '<top>hello</top>', '<top a="1"/>' ]
-        }, */ 
-        
+        }, 
         {
-            description: 'Top element with either #PCDATA or element b iwth atributes x and y',
+            description: 'Top element with #PCDATA',
             dtd: `<!DOCTYPE top [
                 <!ELEMENT top (#PCDATA)>
             ]>
             `,
-            definitions: {
-                'top': {
-                    $id: 'top',
-                    type: 'object',
-                    properties: { element: { const: 'top'} },
-                    content: {
-                        type: 'array',
-                        items: { type: 'string' },
-                        maxItems: 1
+            expected:  {
+                definitions: {
+                    'top': {
+                        $id: 'top',
+                        type: 'object',
+                        properties: { 
+                            element: { const: 'top'},
+                            content: {
+                                type: 'array',
+                                items: { type: 'string' },
+                                maxContains: 1
+                            }
+                        },
                     }
                 }
             },
             instances: [ '<top/>', '<top></top>', '<top>Hello</top>', '<top>Hello world!</top>'  ],
             nonInstances: [ '<root/>', '<top x="1"/>', '<top x="1"></top>', '<top x="1">Hello</top>']
         },
-        /* {
-            description: 'Top element with either #PCDATA or element b iwth atributes x and y',
+        {
+            description: 'Top empty element with optional attribute x',
+            dtd: `<!DOCTYPE top [
+                <!ELEMENT top   EMPTY>
+                <!ATTLIST top x CDATA "">
+            ]>
+            `,
+            expected:  {
+                definitions: {
+                    'top': {
+                        $id: 'top',
+                        type: 'object',
+                        properties: { 
+                            element: { const: 'top'},
+                            attributes: {
+                                type: 'object',
+                                properties: {
+                                    x: { type: 'string'}
+                                },
+                                required: [],
+                                maxProperties: 1
+                            }
+                        },
+                    }
+                }
+            },
+            instances: [ '<top/>', '<top></top>', '<top x="1">', '<top x="1"></top>', '<top x="hello world">'  ],
+            nonInstances: [ '<root/>', '<top y="1"/>', '<top x="1">Hello</top>', '<top x="1" y="2"/>', '<top y="2">Hello world!<top/>']
+        },
+        /*
+        {
+            description: 'Top element with atributes x and y, having as content either #PCDATA or element b with #PCDATA',
             dtd: `<!DOCTYPE top [
                 <!ELEMENT top (#PCDATA | b)>
                 <!ELEMENT b (#PCDATA)>
@@ -88,13 +121,12 @@ describe('DTD and documents',() => {
                         properties: {
                             element: { const: 'b' },
                             properties: {},
-                            required: [],
                             maxProperties: 0
                         },
                         content: {
                             type: 'array',
                             items: { type: 'string' },
-                            maxItems: 1
+                            maxContains: 1
                         }
                     }
                 },
@@ -126,7 +158,7 @@ describe('DTD and documents',() => {
                 });
         
             for(const nonInstance of example.nonInstances)
-                it(`invalidate non-instace ${nonInstance}`, (done) => { 
+                it(`invalidate non-instance ${nonInstance}`, (done) => { 
                     assert(! validate(example.dtd,nonInstance)); 
                     done(); 
                 });

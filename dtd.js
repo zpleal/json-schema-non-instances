@@ -174,11 +174,12 @@ class DTDgenerator {
                     "type": "object",
                     "properties": {},
                     "required": [],
+                    "aditionalProperties": false,
                     "maxProperties": 0
                 },
                 "content": this.parseModel(model),                    
             },
-            "required": [ "element" ]
+            "required": [ "element" ] // "attributes" and "content" may be ommited
         }
     }
 
@@ -187,9 +188,6 @@ class DTDgenerator {
         const attlist = attlistdef.split(/\s+/);
         const definition = this.definitions[element];
         const attributes = definition.properties.attributes; 
-
-        if(attlist.length > 0)
-            definition.required.push("attributes");
 
         if( attlist.length % 3 != 0)
             throw new Error("Invalid # of parts in ATTLIST definition");
@@ -214,6 +212,9 @@ class DTDgenerator {
             attributes.properties[attribute] = schema;
             attributes.maxProperties++;
         }
+
+        if(attributes.required.length > 0 )
+            definition.required.push("attributes");
     }
 
     parseAttributeType(type) {
