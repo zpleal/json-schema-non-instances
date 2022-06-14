@@ -773,8 +773,10 @@ class JSONGenerator {
                 if(! properties.includes(property))
                     return false;
 
+        const missingPropertySchema = jsonSchema.aditionalProperties ?? true;
+
         for(const property of properties) {
-            const schema = jsonSchema?.properties[property] ?? true;
+            const schema = jsonSchema?.properties[property] ?? missingPropertySchema;
             if(! this.jsonValidator(schema,value[property]))
                 return false;
         }
