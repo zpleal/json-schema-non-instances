@@ -13,10 +13,10 @@ describe('Serializer', () => {
     });
 
     describe('Invalid XIJ should throw errors', () => {
-        checkThrows({}, /Invalid node type/);
-        checkThrows({ "ELEMENT": "top" }, /Invalid node type/);
-        checkThrows({ "element": "top", "attributes": 1 }, /Attributes must be an object/);
-        checkThrows({ "element": "top", "content": {} }, /Content must be an array/);
+        checkSerializeThrows({}, /Invalid node type/);
+        checkSerializeThrows({ "ELEMENT": "top" }, /Invalid node type/);
+        checkSerializeThrows({ "element": "top", "attributes": 1 }, /Attributes must be an object/);
+        checkSerializeThrows({ "element": "top", "content": {} }, /Content must be an array/);
     });
 
     describe('The root element with attribues', () => {
@@ -139,7 +139,7 @@ describe('Parser', () => {
 
     ]
 
-    for(const example of examples)
+    for(const example of examples) { console.log(example.description);
         describe(example.description, () => {
             const json = parse(example.xml);
 
@@ -152,8 +152,41 @@ describe('Parser', () => {
                 assert.equal(serialize(json),example.xml);
                 done();
             });
-        });
+        }); }
 });
+
+
+describe('Parser errors', () => {
+    const examples = [
+        {
+            description: 'Missing attribute value delimiter',
+            xml: '',
+            pattern: /empty document/
+        },
+        {
+            description: 'Missing attribute value delimiter',
+            xml: '<top x=1/>',
+            pattern: /invalid attributes/
+        },
+        {
+            description: 'Missing end tag in root',
+            xml: '<top>',
+            pattern: /unexpected end of document/
+        },
+        {
+            description: 'Missing end tag',
+            xml: '<top><b></top>',
+            pattern: /invalid close tag/
+        },
+        
+    ];
+
+    for(const example of examples)
+        describe(example.description, () => {
+            checkParseThrows(example.xml,example.pattern);
+    });
+});
+
 
 /*----------------*\
  |  Utilities     |
@@ -164,9 +197,16 @@ function check(xij, xml) {
     it(xml, (done) => { assert.equal(serialize(xij), xml); done(); });
 }
 
-function checkThrows(xij, pattern) {
+function checkSerializeThrows(xij, pattern) {
     it(`${JSON.stringify(xij)} should report ${pattern}`, (done) => {
         assert.throws(() => serialize(xij), { name: "Error", message: pattern });
+        done();
+    });
+}
+
+function checkParseThrows(xml, pattern) {
+    it(`${JSON.stringify(xml)} should report ${pattern}`, (done) => {
+        assert.throws(() => parse(xml), { name: "Error", message: pattern });
         done();
     });
 }
