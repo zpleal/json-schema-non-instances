@@ -390,7 +390,7 @@ class DTDgenerator {
             const operator = found[0];
             const regExpStr= `\\s*\\${operator}\\s*`;
             const parts    = expression.split(new RegExp(regExpStr));
-            const type     = ',' ? 'sequence' : 'anyOf' ;
+            const type     = operator == ',' ? 'sequence' : 'anyOf' ;
             const items    = parts.map( e => this.parseExpression(e) );
 
             return this.makeExpressionSchema(type, items, repetitionOperator);
