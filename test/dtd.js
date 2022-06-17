@@ -77,7 +77,6 @@ describe('DTD and documents',() => {
             instances: [ '<top/>', '<top></top>', '<top x="1"/>', '<top x="1"></top>', '<top x="hello world"/>'  ],
             nonInstances: [ '<root/>', '<top y="1"/>', '<top x="1">Hello</top>', '<top x="1" y="2"/>', '<top y="2">Hello world!<top/>']
         },
-        /*
         {
             description: 'Top element with atributes x and y, having as content either #PCDATA or element b with #PCDATA',
             dtd: `<!DOCTYPE top [
@@ -140,7 +139,7 @@ describe('DTD and documents',() => {
             nonInstances: [ '<top><a/></top>', '<top><a>Hello</a></top>',
                             '<top z="1"></top>', '<top x="1" y="3"></top>', '<top z="1">Hello</top>',
                             '<top>Hello <b>world</b></top>' ]
-        } */
+        }
     ];
 
     for(const example of examples)
